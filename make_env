@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo "Making sure venv is installed"
+sudo apt-get install python3 python3-venv python3-pip
+
+echo "Initializing Virtual Environments"
+python3 -m venv $PWD
+source $PWD/bin/activate
+pip install --upgrade pip
+
+echo "Installing Meraki API interface library"
+pip install requests
+pip install meraki
+pip install keyring
