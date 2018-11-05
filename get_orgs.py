@@ -16,8 +16,6 @@ P = '\033[95m'  # purple
 Y = '\033[93m'  # yellow
 
 def main(username, actions, admin):
-
-    debug = 'd' in actions
     if debug:
         print(P+"Debugging Enabled"+W)
     verbose = 'v' in actions
@@ -28,32 +26,36 @@ def main(username, actions, admin):
     m_orgs = []
 
     # Accept Invitations, Enable API and do all Org related actions
-    if 'l' in actions or 't' in actions or 'b' in actions:
-        org_lics = process_orgs(username, actions)
-        if debug:
-            print("Return Value: " + str(org_lics))
-
-    apikey = keyring.get_password('merakiapi', username)
-    orgs = meraki.myorgaccess(apikey, (not debug))
+    org_lics = process_orgs(username, actions)
     if debug:
-        print(orgs)
+        print(P+"Return Value: " + str(org_lics)+W)
 
-    # Add administrators if requested
+
+    # Run all of the API based calls
     if 'a' in actions:
+        apikey = keyring.get_password('merakiapi', username)
+        orgs = meraki.myorgaccess(apikey, (not debug))
+        if debug:
+            print(P + orgs + W)
+
         for org in orgs:
             # TODO: Can I dynamically add to the org dictionary of each element
-            print(B+"Checking Administrators in " + org['name'] + ":"+W)
-            grant_org_admin(apikey, org['id'], admin, debug, verbose)
-            # TODO: Make this call dynamic based on the parameters
+
+            print(G + "Processing " + org['name'] + W )
+
+            # Add administrators if requested
+            if 'a' in actions:
+                if verbose:
+                    print(B + "Checking Administrators in " + org['name'] + ":" + W)
+                grant_org_admin(apikey, org['id'], admin)
+                # TODO: Make this call dynamic based on the parameters
 
 
-        # m_org = m_organization(org['id'], org['name'])
-        # m_orgs.append(m_org)
+            # m_org = m_organization(org['id'], org['name'])
+            # m_orgs.append(m_org)
 
 
-
-
-def grant_org_admin(apikey, orgid, new_admin, debug, verbose):
+def grant_org_admin(apikey, orgid, new_admin):
     org_admins = meraki.getorgadmins(apikey, orgid, (not debug))
     if debug:
         print(org_admins)
@@ -78,10 +80,6 @@ def grant_org_admin(apikey, orgid, new_admin, debug, verbose):
 
 
 def process_orgs(username, actions):
-
-    debug = ('d' in actions)
-    verbose = ('v' in actions)
-
     org_ids = [] # [org_id, org_name, org_url]
     adv_lics = [] # [org_id, org_name, adv_license]
 
@@ -142,7 +140,7 @@ def process_orgs(username, actions):
 
                 # Send Form Post to click the "Yes" button accepting access
                 if verbose:
-                    print(G+"  Accepting Org Access: " + uconf + W)
+                    print(G+"  Accepting Org Access: " + user_conf + W)
                 response_post = s.post(post_url, data=payload)
                 if debug:
                     print(str(response_post))
@@ -151,6 +149,9 @@ def process_orgs(username, actions):
                 urlsplit = org_redirect.url.split('/')
                 host = urlsplit[0] + "//" + urlsplit[2]
 
+        # Exit now if we don't need to get license or enable API
+        if not ('l' in actions or 't' in actions or 'b' in actions):
+            return adv_lics
 
 
         # Follow the Org Redirect, then open and parse the license details
@@ -261,10 +262,12 @@ def usage():
 
 
 if __name__ == "__main__":
+
+    global debug, verbose
+
     keyfile = username = ''
     admin = ['', 'read-only', '']
     output_file = ''
-    debug = False
     # TODO Convert admins to a dictionary
 
     actions = []
@@ -280,12 +283,14 @@ if __name__ == "__main__":
     # print(opts)
     # print(args)
 
+    debug = verbose = False
+
     for opt, arg in opts:
         if opt == '-h': # Print usage menu
             usage()
             sys.exit()
         elif opt == '-d': # Set debugging to on
-            actions.append('d')
+            debug = True
         elif opt == '-e': # Email Address to login with
             username = arg
         elif opt == '-a': # Action mode: Add Admins
@@ -311,7 +316,7 @@ if __name__ == "__main__":
         elif opt == '-c': # Output only changes to file
             actions.append('c')
         elif opt == '-v': # Process and print verbosely (slower)
-            actions.append('v')
+            verbose = True
         elif opt == '-b': # Process API Access validation
             actions.append('b')
         # TODO: f for firewall rule gaps
