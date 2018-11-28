@@ -35,81 +35,15 @@ def main(username, actions, admin):
     if 'a' in actions or 'g' in actions:
         apikey = keyring.get_password('merakiapi', username)
         orgs = meraki.myorgaccess(apikey, True)
-        logging.debug(P + str(orgs) + W)
+        logging.debug("{0}The Organization List: {1}{2}".format(P, str(orgs), W))
+
+        if orgs is None:
+            logging.critical("The username specified does not return any Orgs")
+            sys.exit(2)
 
         for org in orgs:
-            # TODO: Can I dynamically add to the org dictionary of each element
-
             print(G + "Processing API Calls for " + org['name'] + W)
-
-            # Add administrators if requested
-            if 'a' in actions:
-                print(G + " Processing Administrators" + W)
-                logging.info(B + "Adding Administrator to " + org['name'] + ":" + W)
-                result = grant_org_admin(apikey, org['id'], admin)
-
-            if 'g' in actions:
-                try:
-                    result = meraki.getnetworklist(apikey, org['id'], None, True)
-                    logging.debug(P + "API Network List: " + W + str(result))
-
-                    for network in result:
-                        needs_update = False
-                        alert_updates = {
-                            'defaultDestinations': None,
-                            'alerts': []
-                        }
-
-                        alerts = meraki.getnetworkalerts(apikey, network['id'], True)
-                        logging.debug("{0}Alerts: {1}{2}".format(P, W, str(alerts)))
-
-                        # Stop email all Network Admins
-                        if alerts['defaultDestinations']['allAdmins'] is True:
-                            needs_update = True
-                            alerts['defaultDestinations']['allAdmins'] = False
-
-                        # # Fix the Default Email list
-                        # if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
-                        #     needs_update = True
-                        #     alerts['defaultDestinations']['emails'].append('alerts@netsmartai.com')
-
-                        # # TODO: Remove all user admin accounts
-                        # if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
-                        #     needs_update = True
-                        #     alerts['defaultDestinations']['emails'].remove('help@netsmart.support')
-
-                        if needs_update:
-                            # Remove the invalid dictionary keys and store
-                            alerts['defaultDestinations'].pop('httpServerIds', None)
-                            alert_updates['defaultDestinations'] = alerts['defaultDestinations']
-
-                        # Fix the destinations list for any alert set to All Admins
-                        for alert in alerts['alerts']:
-                            if alert['alertDestinations']['allAdmins'] is True and alert['enabled'] is True:
-                                needs_update = True
-                                alert['alertDestinations']['allAdmins'] = False
-                                if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
-                                    alert['alertDestinations']['emails'].append('alerts@netsmartai.com')
-                                # TODO: Remove all user admin accounts
-                                if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
-                                    alert['alertDestinations']['emails'].remove('help@netsmart.support')
-
-                                alert['alertDestinations'].pop('httpServerIds', None)
-                                alert_updates['alerts'].append(alert)
-
-                        if needs_update:
-
-                            logging.info("{0}Updating Alert Settings: {1}{2}".format(B, W, str(alert_updates)))
-                            logging.info(meraki.updatenetworkalert(apikey, network['id'], alert_updates))
-
-                except (KeyboardInterrupt, SystemExit):
-                    sys.exit()
-                except Exception as e:
-                    print("{0}Error getting Network List{1}".format(P, W))
-                    logging.debug(str(e))
-
-                # TODO: getlicensestate(apikey, org['id'])
-                # TODO:
+            process_org_api(apikey, org)
 
 
             # m_org = m_organization(org['id'], org['name'])
@@ -118,17 +52,83 @@ def main(username, actions, admin):
     # Accept Invitations, Enable API and do all Org related actions
     org_lics = process_orgs(username, actions)
     logging.info(W + str(org_lics))
-    logging.debug(P + "Return Value: " + str(org_lics) + W)
+    logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics), W))
+
+def process_org_api(apikey, org):
+    # TODO: Can I dynamically add to the org dictionary of each element
+
+
+    # Add administrators if requested
+    if 'a' in actions:
+        print(G + " Processing Administrators" + W)
+        logging.info(B + "Adding Administrator to " + org['name'] + ":" + W)
+        result = grant_org_admin(apikey, org['id'], admin)
+
+    # Validate and adjust Network Alerts
+    if 'g' in actions:
+        try:
+            networks = meraki.getnetworklist(apikey, org['id'], None, True)
+            logging.debug(P + "API Network List: " + W + str(networks))
+
+            for network in networks:
+                needs_update = False
+
+                alerts = meraki.getnetworkalerts(apikey, network['id'], True)
+                logging.debug("{3}{0}Alerts: {1}{2}".format(P, W, str(alerts),network['id']))
+
+                # Stop email all Network Admins
+                if alerts['defaultDestinations']['allAdmins'] is True:
+                    logging.debug("{0}Found Default Destinations:{1}{2}".format(P,alerts['defaultDestinations']),W)
+                    needs_update = True
+                    alerts['defaultDestinations']['allAdmins'] = False
+
+                    # Add alerts email the Default Email list
+                    if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
+                        needs_update = True
+                        alerts['defaultDestinations']['emails'].append('alerts@netsmartai.com')
+
+                    # TODO: Remove all user admin accounts
+                    # Remove help desk email in favor of the alerts (NOC) email
+                    if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
+                        needs_update = True
+                        alerts['defaultDestinations']['emails'].remove('help@netsmart.support')
+
+                # Fix the destinations list for any alert set to All Admins
+                for alert in alerts['alerts']:
+                    if alert['alertDestinations']['allAdmins'] is True and \
+                    alert['enabled'] is True:
+                        logging.debug("Found alert:{0}".format(str(alert)))
+                        needs_update = True
+                        alert['alertDestinations']['allAdmins'] = False
+                        if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
+                            alert['alertDestinations']['emails'].append('alerts@netsmartai.com')
+                        # TODO: Remove all netsmart user admin accounts
+                        if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
+                            alert['alertDestinations']['emails'].remove('help@netsmart.support')
+
+                if needs_update:
+                    logging.info("{0}Updating Alert Settings: {1}{2}".format(B, W, str(alerts)))
+                    resp = meraki.updatenetworkalert(apikey, network['id'], alerts, True)
+                    logging.info("{0}New Alert Settings: {1}{2}".format(B, resp, W))
+
+        except (KeyboardInterrupt, SystemExit):
+            sys.exit()
+        except Exception as e:
+            print("{0}Error processing network alert settings: {1}".format(R, W))
+            logging.error("{0}Error getting Network List{1}{2}".format(R, str(e), W))
+
+        # TODO: getlicensestate(apikey, org['id'])
+        # TODO:
 
 def grant_org_admin(apikey, orgid, new_admin):
     org_admins = meraki.getorgadmins(apikey, orgid, True)
-    logging.debug(org_admins)
+    logging.debug("{0}Org Admin List:{1}{2}".format(P, W, org_admins))
     try:
         notadmin = True
         current_perms = "none"
 
         for admin in org_admins:
-            logging.info(G + "  %s has %s access" + W) % (admin['name'], admin['orgAccess'])
+            logging.info(G + "{0}{1} has {2} access{3}".format(G, admin['name'], admin['orgAccess'], W))
             if admin['email'] == new_admin[0]:
                 notadmin = False
                 current_perms = admin['orgAccess']
@@ -153,14 +153,16 @@ def grant_org_admin(apikey, orgid, new_admin):
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
 
-
-
 def process_orgs(username, actions):
     org_ids = [] # [org_id, org_name, org_url]
     adv_lics = [] # [org_id, org_name, adv_license, amp_mode, ids_mode, ids_rule]
 
     print(G+"Logging in to Meraki Web Portal"+W)
     password = keyring.get_password('meraki', username)
+    if password is None:
+        logging.warning("{0}The keyring 'meraki' password is not set")
+        sys.exit(2)
+
     payload = {
         'email': username,
         'password': password,
@@ -189,21 +191,23 @@ def process_orgs(username, actions):
         print(G+"Checking for new Organization Access"+W)
         try:
             org_redirect = s.get(host + '/login/org_choose?eid=' + (org_ids[0])[0])
-            logging.debug(org_redirect.url)
+            logging.info("Initial Org Redirect URL: " + org_redirect.url)
             soup = BeautifulSoup(org_redirect.content, 'html.parser')
             forms = soup.find_all("form")
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
         except Exception as e:
-            print(R + " Error parsing html form" + W)
-            logging.debug(str(e))
+            print(R + "Error parsing html form" + W)
+            logging.error("{0}Error parsing html form: {1}{2}".format(R,W,str(e)))
 
         # Iterate through all new Organizations and accept access
         for conf in forms:
             # Get the form post url we need for this new Organization
             try:
                 post_url = conf.get('action')
-                if post_url.split('/')[4] == 'confirm_account_submit':
+                logging.info("Post Url: " + post_url)
+                post_split = post_url.split('/')
+                if len(post_split) > 4 and post_split[4] == 'confirm_account_submit':
                     # Build form payload
                     token = conf.find('', {"name": "authenticity_token"}).get('value')
                     user_conf = conf.find('', {"name": "user_conf_key"}).get('value')
@@ -214,12 +218,14 @@ def process_orgs(username, actions):
                         'commit': "Yes"
                     }
 
-                    logging.debug("Found form: " + post_url + " - " + token + " - " + user_conf)
+                    logging.info("{0}Found form: {1} - {2} - {3}{4}".format(
+                        P, post_url, token, user_conf, W
+                    ))
 
                     # Send Form Post to click the "Yes" button accepting access
-                    print(G+"  Accepting Org Access: " + user_conf + W)
+                    logging.info(G+"Accepting Org Access: " + user_conf + W)
                     response_post = s.post(post_url, data=payload)
-                    logging.debug(str(response_post))
+                    logging.debug("Accept Access Post Response: " + str(response_post))
 
                     # Set the host to the currently active server since we've issued another post
                     urlsplit = org_redirect.url.split('/')
@@ -227,8 +233,8 @@ def process_orgs(username, actions):
             except (KeyboardInterrupt, SystemExit):
                 sys.exit()
             except Exception as e:
-                print(R + " Error parsing reply form")
-                logging.debug(str(e))
+                print(R + " Error parsing reply form" + W)
+                logging.error("{0}Error parsing reply form: {1}{2}".format(R,W,str(e)))
 
         # Exit now if we don't need to get license or enable API
         if not ('l' in actions or 't' in actions or 'b' in actions):
@@ -246,8 +252,8 @@ def process_orgs(username, actions):
             except (KeyboardInterrupt, SystemExit):
                 sys.exit()
             except Exception as e:
-                print(R + " Error accessing Organization" + W)
-                print(str(e))
+                print(R + "Error accessing Organization" + W)
+                logging.error("{0}Error accessing Organization: {1}{2}".format(R,W,str(e)))
 
 
             # Enable API access
@@ -309,36 +315,31 @@ def process_orgs(username, actions):
                 if 't' in actions or 'g' in actions:
 
                     # Find and parse out all networks
-                    logging.info(B + " Getting Network List" + W)
                     url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
                     url += '/n/' + urlsplit[5] + '/manage/organization/overview#t=network'
-
                     network_list = s.get(url)
-                    logging.debug(P + "   Network List URL: " + str(network_list.url) + W)
+                    logging.debug(P + "Network List URL: " + W + str(network_list.url))
 
                     try:
                         soup = BeautifulSoup(network_list.content, 'html.parser')
-
                         #network_div = soup.find("", {"id": "network_table"})
                         network_links = soup.find_all('a')
                         logging.debug(P + "Network Links: " + W + str(network_links))
-                        
-                        
                     except (KeyboardInterrupt, SystemExit):
                         sys.exit()
                     except Exception as e:
-                        print(R + "  Error parsing network list" + W)
-                        logging.debug(str(e))
+                        print(R + "Error parsing network list" + W)
+                        logging.error("{0}Error parsing network list: {1}{2}".format(R,W,str(e)))
                         continue
 
                     # Parse out advance security settings and validate them
                     if 't' in actions and advanced_license:
-                        print(G + "  Querying Security Filtering Settings" + W)
+                        print(G + "Querying Security Filtering Settings" + W)
                         url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
                         url += '/n/' + urlsplit[5] + '/manage/configure/security_filtering'
 
                         sec_filter = s.get(url)
-                        logging.debug(P + "   Security Filtering URL:" + str(sec_filter.url) + W)
+                        logging.debug(P + "Security Filtering URL: " + str(sec_filter.url) + W)
 
                         try:
                             soup = BeautifulSoup(sec_filter.content, 'html.parser')
@@ -351,39 +352,34 @@ def process_orgs(username, actions):
                             ids_rule_selector = soup.find("", {"id": "ids_ruleset_select"})
                             ids_rule = ids_rule_selector.find("", {"selected": "selected"}).text
 
-                            logging.info(B + "   AMP: " + amp_mode + " IDS: " + ids_mode + " Ruleset: " + ids_rule + W)
+                            logging.info(B + "AMP: " + amp_mode + " IDS: " + ids_mode + " Ruleset: " + ids_rule + W)
 
                         except (KeyboardInterrupt, SystemExit):
                             sys.exit()
-                        except:
-                            print(R + "  Error Retrieving Threat Protection Settings" + W)
+                        except Exception as e:
+                            print(R + "Error Retrieving Threat Protection Settings" + W)
+                            logging.error("{0}Error Retrieving Threat Protection Settings: {1}{2}".format(P,W,str(e)))
 
-                            # TODO: Parse all threat settings
+                        # TODO: Parse all threat settings
 
                     adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
 
             # TODO: If requested actions is theat gaps, get the details here
-
-
-
         return adv_lics
 
 def usage():
-    msg = 'ns_meraki.py [-d <debug file>] [-h] -e <login email> [-a <admin email> -n <admin name>]'
-    msg += ' [-p <new permission>] [-r <remove admin>] [-l] [-t] [-o] [-c]'
-    print(msg)
+    print('ns_meraki.py -u <username> [options]')
+    print(' u <username>:The email/username authenticate with')
     print(' debug=LEVEL : Sets the debug level of DEBUG, INFO, WARNING, ERROR, CRITICAL')
     print(' log=        : Sets the file that debugging will be sent to')
-    print(' h: Print this usage message')
-    print(' u: The email/username authenticate with')
-    print(' a: Add this email to all organizations as admin')
-    print(' n: The name of the new admin')
-    print(' u: Update the permissions of this Admin')
-    print(' p: "full"|"read-only" for new/updated admin')
-    print(' r: Revoke rights from this Admin')
-    print(' l: Summarize Licenses')
-    print(' t: Print Threat gaps for security settings')
-    print(' o: The output file to write json results to')
+    print(' h           : Print this usage message')
+    print(' a <email>   : Add this email to all organizations as admin')
+    print(' n <name>    : The name of the new admin')
+    print(' p <"full"|"read-only" : Permissions for new/updated admin')
+    print(' r <email>   : Revoke rights from this Admin')
+    print(' l           : Summarize Licenses')
+    print(' t           : Print Threat gaps for security settings')
+    print(' o <filename>: The output file to write json results to')
     print(' c: Limit json output file to a diff from this file')
     print(' b: Validate API access')
 
@@ -479,10 +475,10 @@ if __name__ == "__main__":
             print('You must include a name with the -n parameter')
             sys.exit()
 
-        #   Make sure we have an API Key stored
-        if str(keyring.get_password("merakiapi", username)) == 'None':
-            print("the username must have a 'merakiapi' key stored in keyring")
-            sys.exit(2)
+    #   Make sure we have an API Key stored
+    if str(keyring.get_password("merakiapi", username)) == 'None':
+        print("the username must have a 'merakiapi' key stored in keyring")
+        sys.exit(2)
 
 
 
