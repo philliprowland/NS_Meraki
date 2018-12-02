@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-import sys, getopt, requests, logging
-#from meraki_classes import m_organization
+import sys, getopt, keyring, requests, logging, json, traceback, datetime, os
+import meraki_extension
 from meraki import meraki
 from bs4 import BeautifulSoup
 import keyring
@@ -18,18 +18,7 @@ Y = '\033[93m'  # yellow
 # TODO: IP Spoofing protection (Firewall)
 # TODO: Per Network, alert settings
 
-def main(username, actions, admin):
-
-    if len(log_file) > 0:
-        logging.basicConfig(filename=log_file, level=log_level)
-    else:
-        logging.basicConfig(level=log_level)
-
-
-    m_orgs = []
-
-
-
+def main(username, actions):
 
     # Run all of the API based calls
     if 'a' in actions or 'g' in actions:
@@ -42,12 +31,9 @@ def main(username, actions, admin):
             sys.exit(2)
 
         for org in orgs:
+            #   TODO: Make Threading
             print(G + "Processing API Calls for " + org['name'] + W)
             process_org_api(apikey, org)
-
-
-            # m_org = m_organization(org['id'], org['name'])
-            # m_orgs.append(m_org)
 
     # Accept Invitations, Enable API and do all Org related actions
     org_lics = process_orgs(username, actions)
@@ -57,12 +43,11 @@ def main(username, actions, admin):
 def process_org_api(apikey, org):
     # TODO: Can I dynamically add to the org dictionary of each element
 
-
     # Add administrators if requested
     if 'a' in actions:
-        print(G + " Processing Administrators" + W)
-        logging.info(B + "Adding Administrator to " + org['name'] + ":" + W)
-        result = grant_org_admin(apikey, org['id'], admin)
+        logging.info(B + "Validating Administrators for " + org['name'] + ":" + W)
+
+        grant_org_admin(apikey, org)
 
     # Validate and adjust Network Alerts
     if 'g' in actions:
@@ -73,12 +58,19 @@ def process_org_api(apikey, org):
             for network in networks:
                 needs_update = False
 
-                alerts = meraki.getnetworkalerts(apikey, network['id'], True)
+                alerts = meraki_extension.getnetworkalerts(apikey, network['id'], True)
                 logging.debug("{3}{0}Alerts: {1}{2}".format(P, W, str(alerts),network['id']))
+
+                # Dump JSON alert data to a file
+                json_file = "json/AlertSettings/{0}_{1}_{2}_{3}.json".format(
+                    str_date, network['organizationId'],network['id'],network['name']
+                )
+                os.makedirs(os.path.dirname(json_file), exist_ok=True)
+                json.dump(alerts, open(json_file, "w"))
 
                 # Stop email all Network Admins
                 if alerts['defaultDestinations']['allAdmins'] is True:
-                    logging.debug("{0}Found Default Destinations:{1}{2}".format(P,alerts['defaultDestinations']),W)
+                    logging.debug("{0}Found Default Destinations:{1}{2}".format(P,alerts['defaultDestinations'],W))
                     needs_update = True
                     alerts['defaultDestinations']['allAdmins'] = False
 
@@ -108,50 +100,99 @@ def process_org_api(apikey, org):
 
                 if needs_update:
                     logging.info("{0}Updating Alert Settings: {1}{2}".format(B, W, str(alerts)))
-                    resp = meraki.updatenetworkalert(apikey, network['id'], alerts, True)
+                    resp = meraki_extension.updatenetworkalert(apikey, network['id'], alerts, True)
                     logging.info("{0}New Alert Settings: {1}{2}".format(B, resp, W))
 
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
         except Exception as e:
-            print("{0}Error processing network alert settings: {1}".format(R, W))
-            logging.error("{0}Error getting Network List{1}{2}".format(R, str(e), W))
+            str_err = "Error processing network alert settings: "
+            logging.error("{0}{1}{2}{3}\n{4}".format(
+                R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
+            ))
+            
 
         # TODO: getlicensestate(apikey, org['id'])
         # TODO:
 
-def grant_org_admin(apikey, orgid, new_admin):
-    org_admins = meraki.getorgadmins(apikey, orgid, True)
-    logging.debug("{0}Org Admin List:{1}{2}".format(P, W, org_admins))
+def grant_org_admin(apikey, org):
+    #   Get Admin list for Org from Meraki and serialize to a file
     try:
-        notadmin = True
-        current_perms = "none"
+        org_admins = meraki.getorgadmins(apikey, org['id'], True)
+        logging.debug("{0}Org Admin List:{1}{2}".format(P, W, org_admins))
 
-        for admin in org_admins:
-            logging.info(G + "{0}{1} has {2} access{3}".format(G, admin['name'], admin['orgAccess'], W))
-            if admin['email'] == new_admin[0]:
-                notadmin = False
-                current_perms = admin['orgAccess']
-                break
-
-        # Split logic depending on if the admin already exists
-        if notadmin:
-            logging.info(B + "  " + new_admin[2] + " not found, adding..." + W)
-            resp = meraki.addadmin(apikey, orgid, new_admin[0], new_admin[2], new_admin[1])
-            # TODO: Stop printing results and handle errors only
-        elif current_perms == new_admin[1]:
-            logging.info(B + " " + new_admin[2] + " already has " + admin['orgAccess'] + " access" + W)
-            resp = "No Request Made"
-        else:
-            logging.info(B + " " + new_admin[2] + " found, updating to " + new_admin[1] + " access" +W)
-            resp = meraki.updateadmin(apikey, orgid, new_admin[0], new_admin[2], new_admin[1])
-            # TODO: Stop printing results and handle errors only
-        logging.debug(resp)
-
-    except TypeError:
-        print(R + "  Error processing this Organization" + W)
+        str_json = "json/Admins/{0}_{1}.json".format(str_date, org['name'])
+        json.dump(org_admins, open(str_json, "w"))
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
+    except Exception as e:
+        str_err = "Error getting org admins: "
+        logging.error("{0}{1}{2}{3}\n{4}".format(
+            R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
+        ))
+
+    #   Iterate through Intended Admins and get the appropriate Org's Admin List
+    try:
+        json_org_admins = None
+        for admin_org in json_admins:
+            #   If the org is specified, or is default. This uses the first list found
+            if admin_org['id'] == org['id'] or admin_org['id'] == "0":
+                json_org_admins = admin_org['admins']
+                break
+
+        if json_org_admins is None:
+            logging.warning("{0}No Admin specifications was found for {1}".format(O, org['name'])) 
+            return
+    except (KeyboardInterrupt, SystemExit):
+        sys.exit()
+    except Exception as e:
+        str_err = "Error processing this Organization: "
+        logging.error("{0}{1}{2}{3}{4}\n{5}".format(
+            R, str_err, org['name'], str(e), W, traceback.format_tb(e.__traceback__)
+        ))
+        return
+
+    #   Iterate through Admins in the Org's List and process as needed
+    for new_admin in json_org_admins:
+        try:
+            #   Get matching admin record from live or None if it isn't granted yet
+            admin = next((item for item in org_admins if item['email'] == new_admin['email']), None)
+
+            if admin is None:
+                org_perms = None
+                net_perms = []
+            else:
+                org_perms = admin['orgAccess']
+                net_perms = admin['networks']
+                #   If there is an existing NetworkId that has not been specified,
+                #   Copy existing so we don't update every time due to mismatched
+                #   levels of detail
+                for net_perm in net_perms:
+                    net = next((i for i in new_admin['networks'] if i['id'] == net_perm['id']), None)
+                    if net is None:
+                        new_admin['networks'].append(net_perm)
+
+            # Split logic based on existing permissions
+            if org_perms == new_admin['orgAccess'] and net_perms == new_admin['networks']:
+                logging.info("{0} already has the correct access".format(new_admin['name']))
+            elif admin is None:
+                logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
+                resp = meraki_extension.addnsadmin(apikey, org['id'], new_admin['email'], new_admin['name'], \
+                    new_admin['orgAccess'], None, None, new_admin['networks'], True)
+                logging.debug(resp)
+            else:
+                logging.info("{0}{1} needs updated permissions{2}".format(
+                    B, new_admin['name'], W))
+                resp = meraki_extension.updatensadmin(apikey, org['id'], admin['id'], new_admin['email'], \
+                    new_admin['name'], new_admin['orgAccess'], None, None, new_admin['networks'], True)
+                logging.debug(resp)
+        except (KeyboardInterrupt, SystemExit):
+            sys.exit()
+        except Exception as e:
+            str_err = "Error processing this Administrator: "
+            logging.error("{0}{1}{2}{3}\n{4}\n{5}".format(
+                R, str_err, new_admin['name'], str(e), W, traceback.format_tb(e.__traceback__)
+            ))
 
 def process_orgs(username, actions):
     org_ids = [] # [org_id, org_name, org_url]
@@ -198,7 +239,9 @@ def process_orgs(username, actions):
             sys.exit()
         except Exception as e:
             print(R + "Error parsing html form" + W)
-            logging.error("{0}Error parsing html form: {1}{2}".format(R,W,str(e)))
+            logging.error("{0}Error parsing html form: {1}{2}\n{3}".format(
+                R,W,str(e), traceback.format_tb(e.__traceback__)
+            ))
 
         # Iterate through all new Organizations and accept access
         for conf in forms:
@@ -234,7 +277,9 @@ def process_orgs(username, actions):
                 sys.exit()
             except Exception as e:
                 print(R + " Error parsing reply form" + W)
-                logging.error("{0}Error parsing reply form: {1}{2}".format(R,W,str(e)))
+                logging.error("{0}Error parsing reply form: {1}{2}\n{3}".format(
+                    R,W,str(e), traceback.format_tb(e.__traceback__)
+                ))
 
         # Exit now if we don't need to get license or enable API
         if not ('l' in actions or 't' in actions or 'b' in actions):
@@ -253,7 +298,9 @@ def process_orgs(username, actions):
                 sys.exit()
             except Exception as e:
                 print(R + "Error accessing Organization" + W)
-                logging.error("{0}Error accessing Organization: {1}{2}".format(R,W,str(e)))
+                logging.error("{0}Error accessing Organization: {1}{2}\n{3}".format(
+                    R,W,str(e), traceback.format_tb(e.__traceback__)
+                ))
 
 
             # Enable API access
@@ -279,8 +326,10 @@ def process_orgs(username, actions):
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
                 except Exception as e:
-                    print(R + "  Error validating API Access" + W)
-                    print(str(e))
+                    print(R + "Error validating API Access" + W)
+                    logging.error("{0}Error validating API Access: {1}{2}\n{3}".format(
+                        R,W, str(e), traceback.format_tb(e.__traceback__)
+                    ))
 
 
             # Parse License Details if needed
@@ -306,8 +355,11 @@ def process_orgs(username, actions):
                             advanced_license = (l.find('', {"class": "cfgs"}).text == 'Enabled')
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
-                except:
-                    logging.error(R + "  Error Retrieving Advanced License" + W)
+                except Exception as e:
+                    print(R + "Error Retrieving Advanced License" + W)
+                    logging.error("{0}Error Retrieving Advanced License: {1}{2}\n{3}".format(
+                        R,W, str(e), traceback.format_tb(e.__traceback__)
+                    ))
 
                 # TODO: Scan for non-Advanced Threat gaps
 
@@ -329,7 +381,9 @@ def process_orgs(username, actions):
                         sys.exit()
                     except Exception as e:
                         print(R + "Error parsing network list" + W)
-                        logging.error("{0}Error parsing network list: {1}{2}".format(R,W,str(e)))
+                        logging.error("{0}Error parsing network list: {1}{2}\n{3}".format(
+                            R,W,str(e), traceback.format_tb(e.__traceback__)
+                        ))
                         continue
 
                     # Parse out advance security settings and validate them
@@ -358,7 +412,9 @@ def process_orgs(username, actions):
                             sys.exit()
                         except Exception as e:
                             print(R + "Error Retrieving Threat Protection Settings" + W)
-                            logging.error("{0}Error Retrieving Threat Protection Settings: {1}{2}".format(P,W,str(e)))
+                            logging.error("{0}Error Retrieving Threat Protection Settings: {1}{2}\n{3}".format(
+                                P,W,str(e), traceback.format_tb(e.__traceback__)
+                            ))
 
                         # TODO: Parse all threat settings
 
@@ -373,10 +429,7 @@ def usage():
     print(' debug=LEVEL : Sets the debug level of DEBUG, INFO, WARNING, ERROR, CRITICAL')
     print(' log=        : Sets the file that debugging will be sent to')
     print(' h           : Print this usage message')
-    print(' a <email>   : Add this email to all organizations as admin')
-    print(' n <name>    : The name of the new admin')
-    print(' p <"full"|"read-only" : Permissions for new/updated admin')
-    print(' r <email>   : Revoke rights from this Admin')
+    print(' a <filename>: Manage admins according to json file')
     print(' l           : Summarize Licenses')
     print(' t           : Print Threat gaps for security settings')
     print(' o <filename>: The output file to write json results to')
@@ -387,28 +440,27 @@ def usage():
 
 if __name__ == "__main__":
 
-    global log_level, log_file
+    global log_level, log_file, json_admins, str_date
 
-    keyfile = username = ''
+    keyfile = username = str_admin_file = ''
     admin = ['', 'read-only', '']
     output_file = ''
-    # TODO Convert admins to a dictionary
+    # TODO Tab complete filenames
 
     actions = []
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:n:p:r:lto:cbg', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:n:p:lto:cbg', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
         sys.exit(2)
 
-    # print(opts)
-    # print(args)
+    str_date = datetime.date.today()
 
     log_level = logging.WARNING
-    log_file = ''
+    log_file = None
 
     for opt, arg in opts:
         if opt == '-h':  # Print usage menu
@@ -424,16 +476,9 @@ if __name__ == "__main__":
             log_file = arg
         elif opt == '-u':  # Email Address to login with
             username = arg
-        elif opt == '-a':  # Action mode: Add Admins
+        elif opt == '-a':  # Action mode: Manage Admins
             actions.append('a')
-            admin[0] = arg
-        elif opt == '-n':  # Admin Name
-            admin[2] = arg
-        elif opt == '-p':  # Permission to add/update for Admins
-            admin[1] = arg
-        elif opt == '-r':  # Remove Admins
-            actions.append('r')
-            admin[0] = arg
+            str_admin_file = arg
         elif opt == '-l':  # List Licenses ( Summarize non-advanced at the end )
             actions.append('l')
         elif opt == '-t':  # List Companies with their Threat Gaps
@@ -445,7 +490,7 @@ if __name__ == "__main__":
             actions.append('c')
         elif opt == '-b':  # Process API Access validation
             actions.append('b')
-        elif opt == '-g':
+        elif opt == '-g':  # Process API Network Alert Rules
             actions.append('g')
 
         # TODO: f for firewall rule gaps
@@ -453,33 +498,36 @@ if __name__ == "__main__":
         else:
             assert False, "unhandled option"
 
+    #   Setup Logging Parameters
+    if log_file is not None:
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        logging.basicConfig(filename=log_file, level=log_level)
+    else:
+        logging.basicConfig(level=log_level)
+
     #   Make sure we have a username
     if username == '':
         print("the username parameter is required")
         usage()
         sys.exit(2)
 
+    #   Make sure a file was entered
+    if 'a' in actions:
+        if len(str_admin_file) <= 0:
+            print("a json file must be specified when using -a")
+            usage()
+            sys.exit(2)
 
-    #   Make sure not more than one admin modification is selected
+        # Get the json config handed in 
+        json_admins = json.load(open(str_admin_file, "r"))
+        logging.debug("{0}JSON Admin file loaded: {1}{2}".format(P,W,json_admins))
 
-    if 'a' in actions and 'r' in actions:
-        print('Cannot select multiple administrator operations in one run')
-        sys.exit()
-
-    # ALL API prerequisites checked here
-    if 'a' in actions or 'r' in actions:
-        if admin[1] == '':
-            print('You must include a permission with the -p parameter')
-            sys.exit()
-        if admin[2] == '':
-            print('You must include a name with the -n parameter')
-            sys.exit()
-
-    #   Make sure we have an API Key stored
-    if str(keyring.get_password("merakiapi", username)) == 'None':
-        print("the username must have a 'merakiapi' key stored in keyring")
-        sys.exit(2)
+    if 'a' in actions or 'g' in actions:
+        #   Make sure we have an API Key stored
+        if str(keyring.get_password("merakiapi", username)) == 'None':
+            print("the username must have a 'merakiapi' key stored in keyring")
+            sys.exit(2)
 
 
 
-    main(username, actions, admin)
+    main(username, actions)
