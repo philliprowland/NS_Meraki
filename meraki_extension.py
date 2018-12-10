@@ -133,7 +133,7 @@ def addnsadmin(apikey, orgid, email, name, orgaccess=None, tags=None, tagaccess=
     #
     # Call return handler function to parse Dashboard response
     #
-    result = meraki__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
+    result = meraki.__returnhandler(dashboard.status_code, dashboard.text, calltype, suppressprint)
     return result
 
 

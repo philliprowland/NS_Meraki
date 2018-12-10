@@ -4,7 +4,6 @@ import sys, getopt, keyring, requests, logging, json, traceback, datetime, os
 import meraki_extension
 from meraki import meraki
 from bs4 import BeautifulSoup
-import keyring
 
 # Define Console Color Constants
 W = '\033[0m'  # white (normal)
@@ -17,6 +16,8 @@ Y = '\033[93m'  # yellow
 
 # TODO: IP Spoofing protection (Firewall)
 # TODO: Per Network, alert settings
+# TODO: Modify Ping IP Addresses on Firewall Page
+# TODO: Parse firmware updates and Alert if out of compliance
 
 def main(username, actions):
 
@@ -38,7 +39,7 @@ def main(username, actions):
     # Accept Invitations, Enable API and do all Org related actions
     org_lics = process_orgs(username, actions)
     logging.info(W + str(org_lics))
-    logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics), W))
+    logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics)))
 
 def process_org_api(apikey, org):
     # TODO: Can I dynamically add to the org dictionary of each element
@@ -147,7 +148,7 @@ def grant_org_admin(apikey, org):
         sys.exit()
     except Exception as e:
         str_err = "Error processing this Organization: "
-        logging.error("{0}{1}{2}{3}{4}\n{5}".format(
+        logging.error("{0}{1}{2}: {3}{4}\n{5}".format(
             R, str_err, org['name'], str(e), W, traceback.format_tb(e.__traceback__)
         ))
         return
@@ -190,7 +191,7 @@ def grant_org_admin(apikey, org):
             sys.exit()
         except Exception as e:
             str_err = "Error processing this Administrator: "
-            logging.error("{0}{1}{2}{3}\n{4}\n{5}".format(
+            logging.error("{0}{1}{2}: {3}\n{4}\n{5}".format(
                 R, str_err, new_admin['name'], str(e), W, traceback.format_tb(e.__traceback__)
             ))
 
