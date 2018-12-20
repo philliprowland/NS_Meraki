@@ -11,4 +11,5 @@ pip install --upgrade pip
 echo "Installing Meraki API interface library"
 pip install requests
 pip install meraki
-pip install keyring
+pip install keyring --user
+pip install BS4 --user

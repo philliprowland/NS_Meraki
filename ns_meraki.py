@@ -18,8 +18,17 @@ Y = '\033[93m'  # yellow
 # TODO: Per Network, alert settings
 # TODO: Modify Ping IP Addresses on Firewall Page
 # TODO: Parse firmware updates and Alert if out of compliance
+# TODO: Whitelisting Report
+# TODO: SSID Lists & Export for Review
+# TODO: SAML Roles
+# TODO: https://n159.meraki.com/o/iE011bFc/manage/organization/change_log 
 
 def main(username, actions):
+
+    # Accept Invitations, Enable API and do all Org related actions
+    org_lics = process_orgs(username, actions)
+    logging.info(W + str(org_lics))
+    logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics)))
 
     # Run all of the API based calls
     if 'a' in actions or 'g' in actions:
@@ -35,11 +44,6 @@ def main(username, actions):
             #   TODO: Make Threading
             print(G + "Processing API Calls for " + org['name'] + W)
             process_org_api(apikey, org)
-
-    # Accept Invitations, Enable API and do all Org related actions
-    org_lics = process_orgs(username, actions)
-    logging.info(W + str(org_lics))
-    logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics)))
 
 def process_org_api(apikey, org):
     # TODO: Can I dynamically add to the org dictionary of each element
@@ -283,7 +287,7 @@ def process_orgs(username, actions):
                 ))
 
         # Exit now if we don't need to get license or enable API
-        if not ('l' in actions or 't' in actions or 'b' in actions):
+        if not ('l' in actions or 't' in actions or 'b' in actions or 'c' in actions):
             return adv_lics
 
 
@@ -295,6 +299,7 @@ def process_orgs(username, actions):
             try:
                 org_redirect = s.get(host + '/login/org_choose?eid=' + org[0])
                 logging.debug(P + " Redirected URL:" + org_redirect.url + W)
+                urlsplit = org_redirect.url.split('/')
             except (KeyboardInterrupt, SystemExit):
                 sys.exit()
             except Exception as e:
@@ -302,13 +307,13 @@ def process_orgs(username, actions):
                 logging.error("{0}Error accessing Organization: {1}{2}\n{3}".format(
                     R,W,str(e), traceback.format_tb(e.__traceback__)
                 ))
+                continue
 
 
             # Enable API access
             if 'b' in actions:
                 print("  Querying API Access")
                 try:
-                    urlsplit = org_redirect.url.split('/')
                     url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/edit'
                     org_manage = s.get(url)
                     soup = BeautifulSoup(org_manage.content, 'html.parser')
@@ -332,8 +337,7 @@ def process_orgs(username, actions):
                         R,W, str(e), traceback.format_tb(e.__traceback__)
                     ))
 
-
-            # Parse License Details if needed
+            # Parse License Details and Threat settings if needed 
             if 'l' in actions or 't' in actions:
                 # Break apart the redirected url and rebuild it for the license page
                 # TODO: Modularize this split since it will probably come up regularly
@@ -421,27 +425,69 @@ def process_orgs(username, actions):
 
                     adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
 
+            if 'c' in actions:
+                try:
+                    # Break apart the redirected url and rebuild it for the license page
+                    # TODO: Modularize this split since it will probably come up regularly
+                    print(G+"  Querying Change Log"+W)
+                    url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/change_log'
+                    org_changes = s.get(url)
+                    logging.debug(P + "Change Log URL: " + str(org_changes.url) + W)
+                    logging.debug(org_changes.text)
+
+                    soup = BeautifulSoup(org_changes.text, 'html.parser')
+                    change_table = soup.find('', {"class": "flex-table-body"})
+                    trs = change_table.find_all('tr')
+                    logging.debug("{0}Change Log TDs: {1}{2}".format(P,W,trs))
+
+                    change_log = []
+                    for tr in trs:
+                        change_record = {}
+                        change_record["cl_org"] = org[0]
+                        tds = tr.find_all('td')
+                        for td in tds:
+                            pass
+                            # if ("cl_time" in td.class): change_record["cl_time"] = td.text
+                            # if ("cl_admin" in td.class): change_record["cl_admin"] = td.text
+                            # if ("cl_network" in td.class): change_record["cl_network"] = td.text
+                            # if ("cl_ssid" in td.class): change_record["cl_ssid"] = td.text
+                            # if ("cl_category" in td.class): change_record["cl_category"] = td.text
+                            # if ("cl_label" in td.class): change_record["cl_label"] = td.text
+                            # if ("cl_old_value" in td.class): change_record["cl_old_value"] = td.text
+                            # if ("cl_new_value" in td.class): change_record["cl_new_value"] = td.text
+                        change_log.append(change_record)
+                    
+                    json.dump(change_log, open(changelog_file, "a"))
+                    
+                except (KeyboardInterrupt, SystemExit):
+                    sys.exit()
+                except Exception as e:
+                    print(R + "Error Retrieving Change Log" + W)
+                    logging.error("{0}Error Retrieving Change Log: {1}{2}\n{3}".format(
+                        R,W, str(e), traceback.format_tb(e.__traceback__)
+                    ))
+
             # TODO: If requested actions is theat gaps, get the details here
         return adv_lics
 
 def usage():
     print('ns_meraki.py -u <username> [options]')
-    print(' u <username>:The email/username authenticate with')
-    print(' debug=LEVEL : Sets the debug level of DEBUG, INFO, WARNING, ERROR, CRITICAL')
-    print(' log=        : Sets the file that debugging will be sent to')
-    print(' h           : Print this usage message')
-    print(' a <filename>: Manage admins according to json file')
-    print(' l           : Summarize Licenses')
-    print(' t           : Print Threat gaps for security settings')
-    print(' o <filename>: The output file to write json results to')
-    print(' c: Limit json output file to a diff from this file')
-    print(' b: Validate API access')
+    print(' -u <username>    :The email/username authenticate with')
+    print(' --debug=LEVEL    : Sets the debug level of DEBUG, INFO, WARNING, ERROR, CRITICAL')
+    print(' --log=           : Sets the file that debugging will be sent to')
+    print(' -h               : Print this usage message')
+    print(' -a <filename>    : Manage admins according to json file')
+    print(' -l               : Summarize Licenses')
+    print(' -t               : Print Threat gaps for security settings')
+    print(' -o <filename>    : The output file to write json results to')
+    print(' -c <filename>    : Store Org Change Logs in <filename>')
+    print(' -b               : Validate API access')
 
 
 
 if __name__ == "__main__":
 
-    global log_level, log_file, json_admins, str_date
+    global log_level, log_file, json_admins, str_date, changelog_file
 
     keyfile = username = str_admin_file = ''
     admin = ['', 'read-only', '']
@@ -452,7 +498,7 @@ if __name__ == "__main__":
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:n:p:lto:cbg', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:n:p:lto:c:bg', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -461,7 +507,7 @@ if __name__ == "__main__":
     str_date = datetime.date.today()
 
     log_level = logging.WARNING
-    log_file = None
+    log_file = changelog_file = None
 
     for opt, arg in opts:
         if opt == '-h':  # Print usage menu
@@ -487,7 +533,8 @@ if __name__ == "__main__":
         elif opt in ('-o', 'output-file='):  # Output changes to file
             output_file = arg
             actions.append('o')
-        elif opt == '-c':  # Output only changes to file
+        elif opt == '-c':  # Output change logs to file
+            changelog_file = arg
             actions.append('c')
         elif opt == '-b':  # Process API Access validation
             actions.append('b')
@@ -529,6 +576,8 @@ if __name__ == "__main__":
             print("the username must have a 'merakiapi' key stored in keyring")
             sys.exit(2)
 
+    if 'c' in actions:
+        os.makedirs(os.path.dirname(changelog_file), exist_ok=True)
 
 
     main(username, actions)
