@@ -15,7 +15,7 @@ P = '\033[95m'  # purple
 Y = '\033[93m'  # yellow
 
 # TODO: IP Spoofing protection (Firewall)
-# TODO: Per Network, alert settings
+# TODO: Per Network, alert settings via JSON file
 # TODO: Modify Ping IP Addresses on Firewall Page
 # TODO: Parse firmware updates and Alert if out of compliance
 # TODO: Whitelisting Report
@@ -92,10 +92,13 @@ def process_org_api(apikey, org):
 
                 # Fix the destinations list for any alert set to All Admins
                 for alert in alerts['alerts']:
-                    if alert['alertDestinations']['allAdmins'] is True and \
-                    alert['enabled'] is True:
+                    if alert['enabled'] is False:
+                        continue
+
+                    if alert['alertDestinations']['allAdmins'] is True:
                         logging.debug("Found alert:{0}".format(str(alert)))
                         needs_update = True
+
                         alert['alertDestinations']['allAdmins'] = False
                         if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
                             alert['alertDestinations']['emails'].append('alerts@netsmartai.com')
