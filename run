@@ -1,3 +1,0 @@
-#!/bin/bash
-python get_orgs.py -k ~/.pki/NSHD.api -u meraki_vpn@netsmartai.com
-
