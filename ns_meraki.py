@@ -205,6 +205,7 @@ def grant_org_admin(apikey, org):
 def process_orgs(username, actions):
     org_ids = [] # [org_id, org_name, org_url]
     adv_lics = [] # [org_id, org_name, adv_license, amp_mode, ids_mode, ids_rule]
+    json_changelogs = [] # Hold all change log data so we can dump to a proper JSON file at the end
 
     print(G+"Logging in to Meraki Web Portal"+W)
     password = keyring.get_password('meraki', username)
@@ -432,24 +433,31 @@ def process_orgs(username, actions):
                 try:
                     # Break apart the redirected url and rebuild it for the license page
                     # TODO: Modularize this split since it will probably come up regularly
-                    print(G+"  Querying Change Log"+W)
-                    url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/change_log'
+                    print(G+"  Retrieving Change Log"+W)
+                    #url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/change_log'
+                    url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/more_changes'
                     org_changes = s.get(url)
                     logging.debug(P + "Change Log URL: " + str(org_changes.url) + W)
                     logging.debug(org_changes.text)
 
-                    soup = BeautifulSoup(org_changes.text, 'html.parser')
-                    change_table = soup.find('', {"class": "flex-table-body"})
-                    trs = change_table.find_all('tr')
-                    logging.debug("{0}Change Log TDs: {1}{2}".format(P,W,trs))
+                    changes_json = json.loads(org_changes.text)
+                    changes_json['orgID'] = org[0]
+                    changes_json['orgName'] = org[1]
 
-                    change_log = []
-                    for tr in trs:
-                        change_record = {}
-                        change_record["cl_org"] = org[0]
-                        tds = tr.find_all('td')
-                        for td in tds:
-                            pass
+                    json_changelogs.append(changes_json)                    
+
+                    # soup = BeautifulSoup(org_changes.text, 'html.parser')
+                    # change_table = soup.find('', {"class": "flex-table-body"})
+                    # trs = change_table.find_all('tr')
+                    # logging.debug("{0}Change Log TDs: {1}{2}".format(P,W,trs))
+
+                    # change_log = []
+                    # for tr in trs:
+                    #     change_record = {}
+                    #     change_record["cl_org"] = org[0]
+                    #     tds = tr.find_all('td')
+                    #     for td in tds:
+                    #         pass
                             # if ("cl_time" in td.class): change_record["cl_time"] = td.text
                             # if ("cl_admin" in td.class): change_record["cl_admin"] = td.text
                             # if ("cl_network" in td.class): change_record["cl_network"] = td.text
@@ -458,9 +466,9 @@ def process_orgs(username, actions):
                             # if ("cl_label" in td.class): change_record["cl_label"] = td.text
                             # if ("cl_old_value" in td.class): change_record["cl_old_value"] = td.text
                             # if ("cl_new_value" in td.class): change_record["cl_new_value"] = td.text
-                        change_log.append(change_record)
+                        # change_log.append(change_record)
                     
-                    json.dump(change_log, open(changelog_file, "a"))
+                    # json.dump(change_log, open(changelog_file, "a"))
                     
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
@@ -471,6 +479,11 @@ def process_orgs(username, actions):
                     ))
 
             # TODO: If requested actions is theat gaps, get the details here
+
+        if 'c' in actions:
+            # Write the Change Log JSON data out to file
+            json.dump(json_changelogs, open(changelog_file, "w"))
+
         return adv_lics
 
 def usage():
@@ -483,16 +496,17 @@ def usage():
     print(' -l               : Summarize Licenses')
     print(' -t               : Print Threat gaps for security settings')
     print(' -o <filename>    : The output file to write json results to')
-    print(' -c <filename>    : Store Org Change Logs in <filename>')
+    print(' -c <filename>    : Retrieve and store Org Change Logs in <filename>')
     print(' -b               : Validate API access')
+    print(' -g               : Update all Network Alert Rules')
 
 
 
 if __name__ == "__main__":
 
-    global log_level, log_file, json_admins, str_date, changelog_file
+    global json_admins, str_date, changelog_file
 
-    keyfile = username = str_admin_file = ''
+    username = str_admin_file = ''
     admin = ['', 'read-only', '']
     output_file = ''
     # TODO Tab complete filenames
@@ -501,7 +515,7 @@ if __name__ == "__main__":
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:n:p:lto:c:bg', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:lto:c:bg', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
