@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, getopt, keyring, requests, logging, json, traceback, datetime, os
+import sys, getopt, keyring, requests, logging, json, traceback, datetime, time, os
 from operator import itemgetter
 import meraki_extension
 from meraki import meraki
@@ -443,10 +443,24 @@ def process_orgs(username, actions):
                     logging.debug(org_changes.text)
 
                     changes_json = json.loads(org_changes.text)
-                    changes_json['orgID'] = org[0]
-                    changes_json['orgName'] = org[1]
+                    j_filtered = {}
+                    j_filtered['orgID'] = org[0]
+                    j_filtered['orgName'] = org[1]
+                    j_filtered['changes'] = []
 
-                    json_changelogs.append(changes_json)                    
+                    # Epoch time at time lapse indicated
+                    d_timelapse = int(time.time()) - i_timelapse
+                    logging.info("{0}Ignoring Logs prior to {1}{2}".format(Y, str(d_timelapse), W))
+
+                    for log_entry in changes_json['changes']:
+                    # Remove this entry if it occured before time lapse
+                        if i_timelapse != 0 and log_entry['time'] < d_timelapse:
+                            continue
+
+                        j_filtered['changes'].append(log_entry)
+
+                    logging.debug("{0}Filtered Change Log: {1}{2}".format(P, W, json.dumps(j_filtered)))
+                    json_changelogs.append(j_filtered)                    
 
                     # soup = BeautifulSoup(org_changes.text, 'html.parser')
                     # change_table = soup.find('', {"class": "flex-table-body"})
@@ -499,6 +513,7 @@ def usage():
     print(' -t               : Print Threat gaps for security settings')
     print(' -o <filename>    : The output file to write json results to')
     print(' -c <filename>    : Retrieve and store Org Change Logs in <filename>')
+    print(' -d <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
     print(' -b               : Validate API access')
     print(' -g               : Update all Network Alert Rules')
 
@@ -506,7 +521,7 @@ def usage():
 
 if __name__ == "__main__":
 
-    global json_admins, str_date, changelog_file
+    global json_admins, str_date, changelog_file, i_timelapse
 
     username = str_admin_file = ''
     admin = ['', 'read-only', '']
@@ -517,7 +532,7 @@ if __name__ == "__main__":
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:lto:c:bg', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:lto:c:bgd:', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -527,6 +542,7 @@ if __name__ == "__main__":
 
     log_level = logging.WARNING
     log_file = changelog_file = None
+    i_timelapse = 0
 
     for opt, arg in opts:
         if opt == '-h':  # Print usage menu
@@ -559,6 +575,8 @@ if __name__ == "__main__":
             actions.append('b')
         elif opt == '-g':  # Process API Network Alert Rules
             actions.append('g')
+        elif opt == '-d':  # Set time-lapse argument for filtering to recent logs only
+            i_timelapse = int(arg)
 
         # TODO: f for firewall rule gaps
         # TODO: f arg as a json file to match (does firewall rules contain a rule with policy, protocol, destPort)
