@@ -435,12 +435,11 @@ def process_orgs(username, actions):
                 try:
                     # Break apart the redirected url and rebuild it for the license page
                     # TODO: Modularize this split since it will probably come up regularly
-                    print(G+"  Retrieving Change Log"+W)
+                    print("  Retrieving Change Log")
                     #url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/change_log'
                     url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/organization/more_changes'
                     org_changes = s.get(url)
                     logging.debug(P + "Change Log URL: " + str(org_changes.url) + W)
-                    logging.debug(org_changes.text)
 
                     changes_json = json.loads(org_changes.text)
                     j_filtered = {}
@@ -459,7 +458,7 @@ def process_orgs(username, actions):
 
                         j_filtered['changes'].append(log_entry)
 
-                    logging.debug("{0}Filtered Change Log: {1}{2}".format(P, W, json.dumps(j_filtered)))
+                    #logging.debug("{0}Filtered Change Log: {1}{2}".format(P, W, json.dumps(j_filtered)))
                     json_changelogs.append(j_filtered)                    
 
                     # soup = BeautifulSoup(org_changes.text, 'html.parser')
