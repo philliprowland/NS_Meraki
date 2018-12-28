@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import sys, getopt, keyring, requests, logging, json, traceback, datetime, os
+from operator import itemgetter
 import meraki_extension
 from meraki import meraki
 from bs4 import BeautifulSoup
@@ -235,6 +236,7 @@ def process_orgs(username, actions):
             org_id = org_a.get('href').split('=', 1)[1]
             org_url = org_a.get('href')
             org_ids.append([org_id, org_name, org_url])
+            org_ids.sort(key=itemgetter(2))
             logging.debug("Org A tag: " + str(org_a))
 
         # Follow first Org Redirect and check for new confirmations

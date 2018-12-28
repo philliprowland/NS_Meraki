@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import sys, getopt, logging, json, traceback, datetime, os
+import sys, getopt, logging, json, traceback, datetime, time, os
 from operator import itemgetter
 
 # Define Console Color Constants
@@ -18,12 +18,23 @@ def main(json_changelog):
 
     logging.debug("Change Log Length: {0}".format(len(json_changelog)))
 
+    # Epoch time at time lapse indicated
+    d_timelapse = int(time.time()) - i_timelapse
+
+    # Iterate through each org
     for org_entry in json_changelog:
         logging.debug("{0} has {1} Entries in it's change log".format(org_entry['orgID'], len(org_entry['changes'])))
 
+        # Iterate through each change log entry in the current org
         for log_entry in org_entry['changes']:
+            # Skip this entry if it's an API call and we have been instructed to show web only
             if b_webonly and log_entry['category'] == 'via API':
                 continue
+            
+            # Skip this entry if it occured before time lapse
+            if i_timelapse != 0 and log_entry['time'] < d_timelapse:
+                continue
+
             list_entry = [log_entry['time'],org_entry['orgName'],log_entry['admin_name'],log_entry['network_name'],\
                 log_entry['category'],log_entry['old_text'],log_entry['new_text']]
             list_logs.append(list_entry)
@@ -43,26 +54,26 @@ def usage():
     print(' -i <filename>    : Import <filename> and parse out changes')
     print(' -o <filename>    : The output file to write json results to')
     print(' -w               : Only include web based logs')
+    print(' -t <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
 
 if __name__ == "__main__":
 
-    global str_date, b_webonly
+    global str_date, b_webonly, i_timelapse
 
     str_input_file = str_output_file = ''
     # TODO Tab complete filenames
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hi:o:w', ['debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hi:o:wt:', ['debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
         sys.exit(2)
 
-    str_date = datetime.date.today()
-
     log_level = logging.WARNING
     b_webonly = False
+    i_timelapse = 0
 
     for opt, arg in opts:
         if opt == '-h':  # Print usage menu
@@ -80,6 +91,8 @@ if __name__ == "__main__":
             str_input_file = arg
         elif opt == '-w':  # Set Web Only to True
             b_webonly = True
+        elif opt == '-t':  # Set time-lapse argument for filtering to recent logs only
+            i_timelapse = int(arg)
         else:
             assert False, "unhandled option"
 
