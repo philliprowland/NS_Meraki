@@ -304,7 +304,7 @@ def process_orgs(username, actions):
             
             if b_repeat: 
                 print("Waiting 2 minutes for Meraki to catch up with new Orgs before continuing...")
-                sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
+                time.sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
         
         # Exit now if we don't need to get license or enable API
         if not ('l' in actions or 't' in actions or 'b' in actions or 'c' in actions):
