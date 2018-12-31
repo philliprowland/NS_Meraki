@@ -22,7 +22,6 @@ Y = '\033[93m'  # yellow
 # TODO: Whitelisting Report
 # TODO: SSID Lists & Export for Review
 # TODO: SAML Roles
-# TODO: https://n159.meraki.com/o/iE011bFc/manage/organization/change_log 
 
 def main(username, actions):
 
@@ -45,6 +44,9 @@ def main(username, actions):
             #   TODO: Make Threading
             print(G + "Processing API Calls for " + org['name'] + W)
             process_org_api(apikey, org)
+
+    if 'l' in actions:
+        print(org_lics)
 
 def process_org_api(apikey, org):
     # TODO: Can I dynamically add to the org dictionary of each element
@@ -222,76 +224,88 @@ def process_orgs(username, actions):
 
     # Use 'with' to ensure the session context is closed after use.
     with requests.Session() as s:
-        # Get the Organization List, this is the default redirect page after login
-        host = 'https://account.meraki.com'
-        p = s.post(host + '/login/login', data=payload)
-        logging.debug("Cookies: " + str(s.cookies))
-        soup = BeautifulSoup(p.text, 'html.parser')
-        logging.debug("URL: " + str(p.url))
-        
-        # Parse out all Organization IDs, Names, and initiation URLs
-        for item in soup.find_all('li'):
-            org_a = item.find('a')
-            org_name = org_a.get_text()
-            org_id = org_a.get('href').split('=', 1)[1]
-            org_url = org_a.get('href')
-            org_ids.append([org_id, org_name, org_url])
-            org_ids.sort(key=itemgetter(2))
-            logging.debug("Org A tag: " + str(org_a))
+        b_repeat = True
+        while b_repeat:
+            # Get the Organization List, this is the default redirect page after login
+            host = 'https://account.meraki.com'
+            p = s.post(host + '/login/login', data=payload)
+            logging.debug("Cookies: " + str(s.cookies))
+            soup = BeautifulSoup(p.text, 'html.parser')
+            logging.debug("URL: " + str(p.url))
+            
+            # Parse out all Organization IDs, Names, and initiation URLs
+            for item in soup.find_all('li'):
+                org_a = item.find('a')
+                org_name = org_a.get_text()
+                org_id = org_a.get('href').split('=', 1)[1]
+                org_url = org_a.get('href')
+                org_ids.append([org_id, org_name, org_url])
+                org_ids.sort(key=itemgetter(2))
+                logging.debug("Org A tag: " + str(org_a))
 
-        # Follow first Org Redirect and check for new confirmations
-        print(G+"Checking for new Organization Access"+W)
-        try:
-            org_redirect = s.get(host + '/login/org_choose?eid=' + (org_ids[0])[0])
-            logging.info("Initial Org Redirect URL: " + org_redirect.url)
-            soup = BeautifulSoup(org_redirect.content, 'html.parser')
-            forms = soup.find_all("form")
-        except (KeyboardInterrupt, SystemExit):
-            sys.exit()
-        except Exception as e:
-            print(R + "Error parsing html form" + W)
-            logging.error("{0}Error parsing html form: {1}{2}\n{3}".format(
-                R,W,str(e), traceback.format_tb(e.__traceback__)
-            ))
-
-        # Iterate through all new Organizations and accept access
-        for conf in forms:
-            # Get the form post url we need for this new Organization
+            # Follow first Org Redirect and check for new confirmations
+            print(G+"Checking for new Organization Access"+W)
+            b_repeat = False  # Setup escape from while
             try:
-                post_url = conf.get('action')
-                logging.info("Post Url: " + post_url)
-                post_split = post_url.split('/')
-                if len(post_split) > 4 and post_split[4] == 'confirm_account_submit':
-                    # Build form payload
-                    token = conf.find('', {"name": "authenticity_token"}).get('value')
-                    user_conf = conf.find('', {"name": "user_conf_key"}).get('value')
-                    payload = {
-                        'utf8': "%E2%9C%93",
-                        'authenticity_token': token,
-                        'user_conf_key': user_conf,
-                        'commit': "Yes"
-                    }
+                org_redirect = s.get(host + '/login/org_choose?eid=' + (org_ids[0])[0])
+                logging.info("Initial Org Redirect URL: " + org_redirect.url)
+                soup = BeautifulSoup(org_redirect.content, 'html.parser')
+                forms = soup.find_all("form")
 
-                    logging.info("{0}Found form: {1} - {2} - {3}{4}".format(
-                        P, post_url, token, user_conf, W
-                    ))
 
-                    # Send Form Post to click the "Yes" button accepting access
-                    logging.info(G+"Accepting Org Access: " + user_conf + W)
-                    response_post = s.post(post_url, data=payload)
-                    logging.debug("Accept Access Post Response: " + str(response_post))
-
-                    # Set the host to the currently active server since we've issued another post
-                    urlsplit = org_redirect.url.split('/')
-                    host = urlsplit[0] + "//" + urlsplit[2]
             except (KeyboardInterrupt, SystemExit):
                 sys.exit()
             except Exception as e:
-                print(R + " Error parsing reply form" + W)
-                logging.error("{0}Error parsing reply form: {1}{2}\n{3}".format(
+                print(R + "Error parsing html form" + W)
+                logging.error("{0}Error parsing html form: {1}{2}\n{3}".format(
                     R,W,str(e), traceback.format_tb(e.__traceback__)
                 ))
 
+            # Iterate through all new Organizations and accept access
+            for conf in forms:
+                # Get the form post url we need for this new Organization
+                try:
+                    post_url = conf.get('action')
+                    logging.info("Post Url: " + post_url)
+                    post_split = post_url.split('/')
+                    if len(post_split) > 4 and post_split[4] == 'confirm_account_submit':
+                        # Build form payload
+                        token = conf.find('', {"name": "authenticity_token"}).get('value')
+                        user_conf = conf.find('', {"name": "user_conf_key"}).get('value')
+                        payload = {
+                            'utf8': "%E2%9C%93",
+                            'authenticity_token': token,
+                            'user_conf_key': user_conf,
+                            'commit': "Yes"
+                        }
+
+                        logging.info("{0}Found form: {1} - {2} - {3}{4}".format(
+                            P, post_url, token, user_conf, W
+                        ))
+
+                        # Send Form Post to click the "Yes" button accepting access
+                        logging.info(G+"Accepting Org Access: " + user_conf + W)
+                        response_post = s.post(post_url, data=payload)
+                        logging.debug("Accept Access Post Response: " + str(response_post))
+
+                        # Set the host to the currently active server since we've issued another post
+                        urlsplit = org_redirect.url.split('/')
+                        host = urlsplit[0] + "//" + urlsplit[2]
+
+                        # Make sure we go back and get an updated list
+                        b_repeat = False
+                except (KeyboardInterrupt, SystemExit):
+                    sys.exit()
+                except Exception as e:
+                    print(R + " Error parsing reply form" + W)
+                    logging.error("{0}Error parsing reply form: {1}{2}\n{3}".format(
+                        R,W,str(e), traceback.format_tb(e.__traceback__)
+                    ))
+            
+            if b_repeat: 
+                print("Waiting 2 minutes for Meraki to catch up with new Orgs before continuing...")
+                sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
+        
         # Exit now if we don't need to get license or enable API
         if not ('l' in actions or 't' in actions or 'b' in actions or 'c' in actions):
             return adv_lics
@@ -361,7 +375,9 @@ def process_orgs(username, actions):
                     trs = licenses.find_all('tr')
                     logging.debug(p)
                     for l in trs:
-                        if l.find('', {"class": "cfgq"}).text == "MX Advanced Security":
+                        td_cfgq = l.find('', {"class": "cfgq"})
+                        if td_cfgq is None: continue
+                        if td_cfgq.text == "MX Advanced Security":
                             # TODO: Parse out Expiration date and store for future use
                             advanced_license = (l.find('', {"class": "cfgs"}).text == 'Enabled')
                 except (KeyboardInterrupt, SystemExit):
