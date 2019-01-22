@@ -226,6 +226,7 @@ def process_orgs(username, actions):
     with requests.Session() as s:
         b_repeat = True
         while b_repeat:
+            b_repeat = False  # Default to checking once
             # Get the Organization List, this is the default redirect page after login
             host = 'https://account.meraki.com'
             p = s.post(host + '/login/login', data=payload)
@@ -293,7 +294,7 @@ def process_orgs(username, actions):
                         host = urlsplit[0] + "//" + urlsplit[2]
 
                         # Make sure we go back and get an updated list
-                        b_repeat = False
+                        b_repeat = True
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
                 except Exception as e:
@@ -361,7 +362,7 @@ def process_orgs(username, actions):
             if 'l' in actions or 't' in actions:
                 # Break apart the redirected url and rebuild it for the license page
                 # TODO: Modularize this split since it will probably come up regularly
-                print(G+"  Querying Advanced License"+W)
+                print("  Querying Advanced License")
                 urlsplit = org_redirect.url.split('/')
                 logging.debug("URL Split: " + str(urlsplit))
                 url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/dashboard/license_info'
@@ -391,7 +392,7 @@ def process_orgs(username, actions):
                 # TODO: Scan for non-Advanced Threat gaps
 
                 # All per network checks go here
-                if 't' in actions or 'g' in actions:
+                if 't' in actions:
 
                     # Find and parse out all networks
                     url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
@@ -414,8 +415,8 @@ def process_orgs(username, actions):
                         continue
 
                     # Parse out advance security settings and validate them
-                    if 't' in actions and advanced_license:
-                        print(G + "Querying Security Filtering Settings" + W)
+                    if advanced_license:
+                        print("  Querying Security Filtering Settings")
                         url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
                         url += '/n/' + urlsplit[5] + '/manage/configure/security_filtering'
 
@@ -445,7 +446,8 @@ def process_orgs(username, actions):
 
                         # TODO: Parse all threat settings
 
-                    adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
+                # Append this Org and details to the return list
+                adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
 
             if 'c' in actions:
                 try:
