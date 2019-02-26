@@ -361,7 +361,7 @@ def process_orgs(username, actions):
             if 'l' in actions or 't' in actions:
                 # Break apart the redirected url and rebuild it for the license page
                 # TODO: Modularize this split since it will probably come up regularly
-                print(G+"  Querying Advanced License"+W)
+                print("  Querying Advanced License")
                 urlsplit = org_redirect.url.split('/')
                 logging.debug("URL Split: " + str(urlsplit))
                 url = urlsplit[0] + '//' + urlsplit[2] + '/o/' + org[0] + '/manage/dashboard/license_info'
@@ -391,7 +391,7 @@ def process_orgs(username, actions):
                 # TODO: Scan for non-Advanced Threat gaps
 
                 # All per network checks go here
-                if 't' in actions or 'g' in actions:
+                if 't' in actions:
 
                     # Find and parse out all networks
                     url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
@@ -414,8 +414,8 @@ def process_orgs(username, actions):
                         continue
 
                     # Parse out advance security settings and validate them
-                    if 't' in actions and advanced_license:
-                        print(G + "Querying Security Filtering Settings" + W)
+                    if advanced_license:
+                        print("  Querying Security Filtering Settings")
                         url = urlsplit[0] + '//' + urlsplit[2] + '/' + urlsplit[3]
                         url += '/n/' + urlsplit[5] + '/manage/configure/security_filtering'
 
@@ -443,9 +443,49 @@ def process_orgs(username, actions):
                                 P,W,str(e), traceback.format_tb(e.__traceback__)
                             ))
 
+                        # Capture Security Events and store in specified file
+                        if 'e' in actions:
+                            print("  Querying Security Events")
+                            url = urlsplit[0] + '//' + urlsplit[2]
+                            url += '/o/' + org[0] + '/manage/security/threat_summary.json'
+
+                            sec_events = s.get(url)
+                            logging.debug(P + "Security Events URL: " + str(sec_events.url) + W)
+
+                            logging.debug(P + "Security Threats: " + W + sec_events.text)
+                            list_secevents = []
+
+                            # try:
+                            #     soup = BeautifulSoup(sec_events.content, 'html.parser')
+                            #     logging.debug(P + soup.text + W)
+                            #     div_secevents = soup.find("", {"class": "TopThreats"})
+                            #     table_secevents = div_secevents.find("", {"class": "SimpleTable__body"})
+                            #     trs = table_secevents.find_all('tr')
+                            #     for tr in trs:
+                            #         # Parse out the Threat Category
+                            #         div_threat = tr.find('', {"class": "ThreatCardLink"})
+                            #         sec_threat = div_threat.find('a').text
+
+                            #         sec_label = div_threat.find('', {"class": "label label-default"}).text
+
+                            #         sec_count = tr.find('', {"class": "SimpleTable__cell Table__text--alignRight"}).text
+
+                            #         sec_event = [urlsplit[5], sec_label, sec_threat, sec_count]
+                            #         list_secevents.append(sec_event)
+
+                                
+                            #     logging.debug(P + "Security Threats: " + W + list_secevents)
+                            # except (KeyboardInterrupt, SystemExit):
+                            #     sys.exit()
+                            # except Exception as e:
+                            #     print(R + "Error Retrieving Security Events" + W)
+                            #     logging.error("{0}Error Retrieving Security: {1}{2}\n{3}".format(
+                            #         P,W,str(e), traceback.format_tb(e.__traceback__)
+                            #     ))
                         # TODO: Parse all threat settings
 
-                    adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
+                # Append this Org and details to the return list
+                adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
 
             if 'c' in actions:
                 try:
@@ -538,7 +578,7 @@ if __name__ == "__main__":
 
     global json_admins, str_date, changelog_file, i_timelapse
 
-    username = str_admin_file = ''
+    username = str_admin_file = str_events_file = ''
     admin = ['', 'read-only', '']
     output_file = ''
     # TODO Tab complete filenames
@@ -547,7 +587,7 @@ if __name__ == "__main__":
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:lto:c:bgd:', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:e:lto:c:bgd:', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -576,6 +616,9 @@ if __name__ == "__main__":
         elif opt == '-a':  # Action mode: Manage Admins
             actions.append('a')
             str_admin_file = arg
+        elif opt == '-e':  # Capture Security Events and store in specified json file
+            actions.append('e')
+            str_events_file = arg
         elif opt == '-l':  # List Licenses ( Summarize non-advanced at the end )
             actions.append('l')
         elif opt == '-t':  # List Companies with their Threat Gaps
@@ -631,5 +674,7 @@ if __name__ == "__main__":
     if 'c' in actions:
         os.makedirs(os.path.dirname(changelog_file), exist_ok=True)
 
+    if 'e' in actions:
+        os.makedirs(os.path.dirname(str_events_file), exist_ok=True)
 
     main(username, actions)
