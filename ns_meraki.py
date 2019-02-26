@@ -226,6 +226,7 @@ def process_orgs(username, actions):
     with requests.Session() as s:
         b_repeat = True
         while b_repeat:
+            b_repeat = False  # Default to checking once
             # Get the Organization List, this is the default redirect page after login
             host = 'https://account.meraki.com'
             p = s.post(host + '/login/login', data=payload)
@@ -293,7 +294,7 @@ def process_orgs(username, actions):
                         host = urlsplit[0] + "//" + urlsplit[2]
 
                         # Make sure we go back and get an updated list
-                        b_repeat = False
+                        b_repeat = True
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
                 except Exception as e:
