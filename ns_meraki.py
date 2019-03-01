@@ -121,10 +121,6 @@ def process_org_api(apikey, org):
             logging.error("{0}{1}{2}{3}\n{4}".format(
                 R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
             ))
-            
-
-        # TODO: getlicensestate(apikey, org['id'])
-        # TODO:
 
 def grant_org_admin(apikey, org):
     #   Get Admin list for Org from Meraki and serialize to a file
@@ -209,6 +205,7 @@ def process_orgs(username, actions):
     org_ids = [] # [org_id, org_name, org_url]
     adv_lics = [] # [org_id, org_name, adv_license, amp_mode, ids_mode, ids_rule]
     json_changelogs = [] # Hold all change log data so we can dump to a proper JSON file at the end
+    json_secevents = [] # Hold all security event data for dumping to a proper JSON file
 
     print(G+"Logging in to Meraki Web Portal"+W)
     password = keyring.get_password('meraki', username)
@@ -223,9 +220,9 @@ def process_orgs(username, actions):
     }
 
     # Use 'with' to ensure the session context is closed after use.
-    with requests.Session() as s:
-        b_repeat = True
-        while b_repeat:
+    b_repeat = True
+    while b_repeat:
+        with requests.Session() as s:  
             b_repeat = False  # Default to checking once
             # Get the Organization List, this is the default redirect page after login
             host = 'https://account.meraki.com'
@@ -444,49 +441,30 @@ def process_orgs(username, actions):
                                 P,W,str(e), traceback.format_tb(e.__traceback__)
                             ))
 
-                        # Capture Security Events and store in specified file
-                        if 'e' in actions:
-                            print("  Querying Security Events")
-                            url = urlsplit[0] + '//' + urlsplit[2]
-                            url += '/o/' + org[0] + '/manage/security/threat_summary.json'
+                        
 
-                            sec_events = s.get(url)
-                            logging.debug(P + "Security Events URL: " + str(sec_events.url) + W)
-
-                            logging.debug(P + "Security Threats: " + W + sec_events.text)
-                            list_secevents = []
-
-                            # try:
-                            #     soup = BeautifulSoup(sec_events.content, 'html.parser')
-                            #     logging.debug(P + soup.text + W)
-                            #     div_secevents = soup.find("", {"class": "TopThreats"})
-                            #     table_secevents = div_secevents.find("", {"class": "SimpleTable__body"})
-                            #     trs = table_secevents.find_all('tr')
-                            #     for tr in trs:
-                            #         # Parse out the Threat Category
-                            #         div_threat = tr.find('', {"class": "ThreatCardLink"})
-                            #         sec_threat = div_threat.find('a').text
-
-                            #         sec_label = div_threat.find('', {"class": "label label-default"}).text
-
-                            #         sec_count = tr.find('', {"class": "SimpleTable__cell Table__text--alignRight"}).text
-
-                            #         sec_event = [urlsplit[5], sec_label, sec_threat, sec_count]
-                            #         list_secevents.append(sec_event)
-
-                                
-                            #     logging.debug(P + "Security Threats: " + W + list_secevents)
-                            # except (KeyboardInterrupt, SystemExit):
-                            #     sys.exit()
-                            # except Exception as e:
-                            #     print(R + "Error Retrieving Security Events" + W)
-                            #     logging.error("{0}Error Retrieving Security: {1}{2}\n{3}".format(
-                            #         P,W,str(e), traceback.format_tb(e.__traceback__)
-                            #     ))
+                            
                         # TODO: Parse all threat settings
 
                 # Append this Org and details to the return list
                 adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
+            
+            # Capture Security Events and store in specified file
+            if 'e' in actions:
+                print("  Querying Security Events")
+                url = urlsplit[0] + '//' + urlsplit[2]
+                url += '/o/' + org[0] + '/manage/security/threat_summary.json'
+
+                sec_events = s.get(url)
+                logging.info(P + "Security Events URL: " + str(sec_events.url) + W)
+
+                logging.info(P + "Security Threats: " + W + sec_events.text)
+                j_secevents = {}
+                j_secevents['orgID'] = org[0]
+                j_secevents['orgName'] = org[1]
+                j_secevents['securityEvents'] = sec_events.text
+                json_secevents.append(j_secevents)
+
 
             if 'c' in actions:
                 try:
@@ -551,7 +529,9 @@ def process_orgs(username, actions):
                     ))
 
             # TODO: If requested actions is theat gaps, get the details here
-
+        if 'e' in actions:
+            # Write the Security Events JSON data out to file
+            json.dump(json_secevents, open(str_events_file, "w"))
         if 'c' in actions:
             # Write the Change Log JSON data out to file
             json.dump(json_changelogs, open(changelog_file, "w"))
@@ -577,7 +557,7 @@ def usage():
 
 if __name__ == "__main__":
 
-    global json_admins, str_date, changelog_file, i_timelapse
+    global json_admins, str_date, changelog_file, i_timelapse, str_events_file
 
     username = str_admin_file = str_events_file = ''
     admin = ['', 'read-only', '']
