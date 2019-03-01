@@ -452,7 +452,7 @@ def process_orgs(username, actions):
             if 'e' in actions:
                 print("  Querying Security Events")
                 url = urlsplit[0] + '//' + urlsplit[2]
-                url += '/o/' + org[0] + '/manage/security/threat_summary.json'
+                url += '/o/' + org[0] + '/manage/security/threat_summary.json?timespan=' + str(i_timelapse)
 
                 sec_events = s.get(url)
                 logging.info(P + "Security Events URL: " + str(sec_events.url) + W)
