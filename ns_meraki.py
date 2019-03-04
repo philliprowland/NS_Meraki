@@ -456,8 +456,6 @@ def process_orgs(username, actions):
 
                 sec_events = s.get(url)
                 logging.info(P + "Security Events URL: " + str(sec_events.url) + W)
-
-                logging.info(P + "Security Threats: " + W + sec_events.text)
                 j_secevents = {}
                 j_secevents['orgID'] = org[0]
                 j_secevents['orgName'] = org[1]
