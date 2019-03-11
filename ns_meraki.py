@@ -173,7 +173,7 @@ def grant_org_admin(apikey, org):
                 for new_perm in new_admin['networks']:
                     net = next((i for i in net_perms if i['id'] == new_perm['id']), None)
                     if net is None:
-                        net_perms[].append(new_perm)
+                        net_perms.append(new_perm)
 
             # Split logic based on existing permissions
             if org_perms == new_admin['orgAccess'] and net_perms == new_admin['networks']:
