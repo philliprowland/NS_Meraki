@@ -181,7 +181,7 @@ def grant_org_admin(apikey, org):
                 logging.info("{0} already has the correct access".format(new_admin['name']))
             elif admin is None:
                 logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
-                logging.debug("Invite Detaisl: {0}".format(new_admin))
+                logging.debug("Invite Details: {0}".format(new_admin))
                 resp = meraki_extension.addnsadmin(apikey, org['id'], new_admin['email'], new_admin['name'], \
                     new_admin['orgAccess'], None, None, new_admin['networks'], True)
                 logging.debug(resp)
