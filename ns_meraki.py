@@ -167,13 +167,13 @@ def grant_org_admin(apikey, org):
             if admin is not None:
                 org_perms = admin['orgAccess']
                 net_perms = admin['networks']
-                #   If there is an existing NetworkId that has not been specified,
-                #   Copy existing so we don't update every time due to mismatched
+                #   Copy any specified network permissions to existing list
+                #   so we don't update every time due to mismatched
                 #   levels of detail
-                for net_perm in net_perms:
-                    net = next((i for i in new_admin['networks'] if i['id'] == net_perm['id']), None)
+                for net_perm in new_admin['networks']:
+                    net = next((i for i in net_perms[] if i['id'] == net_perm['id']), None)
                     if net is None:
-                        new_admin['networks'].append(net_perm)
+                        net_perms[].append(net_perm)
 
             # Split logic based on existing permissions
             if org_perms == new_admin['orgAccess'] and net_perms == new_admin['networks']:
@@ -188,7 +188,7 @@ def grant_org_admin(apikey, org):
                 logging.info("{0}{1} needs updated permissions{2}".format(
                     B, new_admin['name'], W))
                 resp = meraki_extension.updatensadmin(apikey, org['id'], admin['id'], new_admin['email'], \
-                    new_admin['name'], new_admin['orgAccess'], None, None, new_admin['networks'], True)
+                    new_admin['name'], new_admin['orgAccess'], None, None, net_perms, True)
                 logging.debug(resp)
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
