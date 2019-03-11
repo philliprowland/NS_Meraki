@@ -164,19 +164,20 @@ def grant_org_admin(apikey, org):
 
             org_perms = None
             net_perms = []
+            new_perms = []
             if admin is not None:
                 org_perms = admin['orgAccess']
-                net_perms = admin['networks']
+                net_perms = new_perms = admin['networks']
                 #   Copy any specified network permissions to existing list
                 #   so we don't update every time due to mismatched
                 #   levels of detail
                 for new_perm in new_admin['networks']:
                     net = next((i for i in net_perms if i['id'] == new_perm['id']), None)
                     if net is None:
-                        net_perms.append(new_perm)
+                        new_perms.append(new_perm)
 
             # Split logic based on existing permissions
-            if org_perms == new_admin['orgAccess'] and net_perms == new_admin['networks']:
+            if org_perms == new_admin['orgAccess'] and net_perms == new_perms:
                 logging.info("{0} already has the correct access".format(new_admin['name']))
             elif admin is None:
                 logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
@@ -188,7 +189,7 @@ def grant_org_admin(apikey, org):
                 logging.info("{0}{1} needs updated permissions{2}".format(
                     B, new_admin['name'], W))
                 resp = meraki_extension.updatensadmin(apikey, org['id'], admin['id'], new_admin['email'], \
-                    new_admin['name'], new_admin['orgAccess'], None, None, net_perms, True)
+                    new_admin['name'], new_admin['orgAccess'], None, None, new_perms, True)
                 logging.debug(resp)
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
