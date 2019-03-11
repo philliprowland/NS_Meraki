@@ -127,9 +127,6 @@ def grant_org_admin(apikey, org):
     try:
         org_admins = meraki.getorgadmins(apikey, org['id'], True)
         logging.debug("{0}Org Admin List:{1}{2}".format(P, W, org_admins))
-
-        str_json = "json/Admins/{0}_{1}.json".format(str_date, org['name'])
-        json.dump(org_admins, open(str_json, "w"))
     except (KeyboardInterrupt, SystemExit):
         sys.exit()
     except Exception as e:
@@ -184,6 +181,7 @@ def grant_org_admin(apikey, org):
                 logging.info("{0} already has the correct access".format(new_admin['name']))
             elif admin is None:
                 logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
+                logging.debug("Invite Detaisl: {0}".format(new_admin))
                 resp = meraki_extension.addnsadmin(apikey, org['id'], new_admin['email'], new_admin['name'], \
                     new_admin['orgAccess'], None, None, new_admin['networks'], True)
                 logging.debug(resp)
