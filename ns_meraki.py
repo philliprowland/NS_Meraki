@@ -162,10 +162,9 @@ def grant_org_admin(apikey, org):
             #   Get matching admin record from live or None if it isn't granted yet
             admin = next((item for item in org_admins if item['email'] == new_admin['email']), None)
 
-            if admin is None:
-                org_perms = None
-                net_perms = []
-            else:
+            org_perms = None
+            net_perms = []
+            if admin is not None:
                 org_perms = admin['orgAccess']
                 net_perms = admin['networks']
                 #   If there is an existing NetworkId that has not been specified,
