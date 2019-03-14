@@ -63,13 +63,9 @@ def main(json_events):
             C = R
             write = True
             if type(log[2]) is int:
-                if (log[2] >= 3):
-                    C = R
-                    write = True
-                else 
-                    C = G
-                    write = False
-                
+                if log[2] < 
+                C = R if (log[2] >= 3) else G
+                write = True if (log)
             list_logtext.append("{4}{0}: {3} occurrences of {1} - Priority {2} {5}".format(log[0],log[1],log[2],log[3],C,W))
         except Exception as e:
             logging.error(R + "Error printing event: " + log[0] + " - " + log[1] + W)
