@@ -108,3 +108,9 @@ venv.bak/
 
 *.json
 *.log
+bin/activate
+bin/activate.csh
+bin/activate.fish
+bin/keyring
+bin/pip3
+bin/pip3.5
