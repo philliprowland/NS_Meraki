@@ -61,8 +61,15 @@ def main(json_events):
     for log in list_logs:
         try:
             C = R
+            write = True
             if type(log[2]) is int:
-                C = R if (log[2] >= 3) else G
+                if (log[2] >= 3):
+                    C = R
+                    write = True
+                else 
+                    C = G
+                    write = False
+                
             list_logtext.append("{4}{0}: {3} occurrences of {1} - Priority {2} {5}".format(log[0],log[1],log[2],log[3],C,W))
         except Exception as e:
             logging.error(R + "Error printing event: " + log[0] + " - " + log[1] + W)
@@ -80,6 +87,7 @@ def usage():
     print(' -o <filename>    : The output file to write json results to')
     print(' -w               : Only include web based logs')
     print(' -t <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
+    print(' -l <# level>     : Only include priority events greater than this')
 
 if __name__ == "__main__":
 
@@ -110,7 +118,7 @@ if __name__ == "__main__":
                 print(R + "Invalid Logging Level, please use DEBUG, INFO, WARNING, ERROR, CRITICAL or FATAL" + W)
                 usage()
                 sys.exit(2)
-        elif opt == '-o':  # Output file for parsed changes
+        elif opt == '-o':  # Output file for parsed events
             str_output_file = arg
         elif opt == '-i':  # Input file to read
             str_input_file = arg
