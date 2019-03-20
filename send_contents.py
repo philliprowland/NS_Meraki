@@ -45,11 +45,13 @@ def main(str_file, str_login, str_email, str_subject):
         mailserver.starttls()
         mailserver.login(str_login, password)
         mailserver.send_message(msg)
+        mailserver.close()
     except Exception as e:
         str_err = "Error sending message: "
         logging.fatal("{0}{1}{2}{3}\n{4}".format(
             R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
         ))
+        mailserver.close()
         logging.shutdown()
         sys.exit(2)
 
@@ -106,6 +108,6 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    l_results = main(str_input_file, str_login, str_email_address, str_subject)
+    main(str_input_file, str_login, str_email_address, str_subject)
 
     logging.shutdown()
