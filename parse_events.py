@@ -66,7 +66,7 @@ def main(json_events):
                 #if log[2] < 
                 C = R if (log[2] >= 3) else G
                 #write = True if (log)
-            list_logtext.append("{4}{0}: {3} occurrences of {1} - Priority {2} {5}".format(log[0],log[1],log[2],log[3],C,W))
+            list_logtext.append("{4}Priority {2} - {0}: {3} occurrences of {1} {5}".format(log[0],log[1],log[2],log[3],C,W))
         except Exception as e:
             logging.error(R + "Error printing event: " + log[0] + " - " + log[1] + W)
             logging.error("{0}Error printing event: {1}{2}\n{3}".format(
@@ -156,6 +156,6 @@ if __name__ == "__main__":
     else:
         with open(str_output_file, "w") as f:
             for s_log in l_results:
-                f.write(s_log + "\n")
+                f.write(s_log[5:] + "\n") # Strip out the colorization in the file as this does not translate to any format other than linux console
 
     logging.shutdown()
