@@ -121,6 +121,8 @@ if __name__ == "__main__":
 
     l_results = main(json_changelog)
 
+    logging.debug("A total of {0} change logs read from json".format(l_results.count))
+
     try:
         if len(str_output_file) <=0:
             for s_log in l_results:
