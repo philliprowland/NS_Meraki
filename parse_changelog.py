@@ -126,11 +126,11 @@ if __name__ == "__main__":
     try:
         if len(str_output_file) <=0:
             for s_log in l_results:
-                print(s_log)
+                print(s_log.replace(u"\u2018", "'").replace(u"\u2019", "'"))
         else:
             with open(str_output_file, "w") as f:
                 for s_log in l_results:
-                    f.write(s_log + "\n")
+                    f.write(s_log.replace(u"\u2018", "'").replace(u"\u2019", "'") + "\n")
     except Exception as e:
         str_err = "Error printing Change Log results: "
         logging.fatal("{0}{1}{2}{3}\n{4}".format(
