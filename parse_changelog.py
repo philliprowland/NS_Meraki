@@ -121,12 +121,20 @@ if __name__ == "__main__":
 
     l_results = main(json_changelog)
 
-    if len(str_output_file) <=0:
-        for s_log in l_results:
-            print(s_log)
-    else:
-        with open(str_output_file, "w") as f:
+    try:
+        if len(str_output_file) <=0:
             for s_log in l_results:
-                f.write(s_log + "\n")
+                print(s_log)
+        else:
+            with open(str_output_file, "w") as f:
+                for s_log in l_results:
+                    f.write(s_log + "\n")
+    except Exception as e:
+        str_err = "Error printing Change Log results: "
+        logging.fatal("{0}{1}{2}{3}\n{4}".format(
+            R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
+        ))
+        logging.shutdown()
+        sys.exit(2)
 
     logging.shutdown()
