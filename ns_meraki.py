@@ -199,6 +199,12 @@ def grant_org_admin(apikey, org):
                 R, str_err, new_admin['name'], str(e), W, traceback.format_tb(e.__traceback__)
             ))
 
+#TODO: def get_orglist(username) {process_orgs > Item parsing} Return Dictionary
+#TODO: def accept_invitations(username) {process_orgs:Follow First > Wait 2 minutes} return Bool
+#TODO: b_repeat loop in main around accept_invitations
+#TODO: def process_org(username, org, actions){remaining process_orgs} return modified org
+#TODO: Semaphore threading.Lock() in list with sessions to find open Sessions use with lock and with session
+
 def process_orgs(username, actions):
     org_ids = [] # [org_id, org_name, org_url]
     adv_lics = [] # [org_id, org_name, adv_license, amp_mode, ids_mode, ids_rule]
@@ -299,6 +305,7 @@ def process_orgs(username, actions):
             
             if b_repeat: 
                 print("Waiting 2 minutes for Meraki to catch up with new Orgs before continuing...")
+                b_repeat = False
                 time.sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
         
         # Exit now if we don't need to get license or enable API
@@ -344,6 +351,7 @@ def process_orgs(username, actions):
                             'organization[provisioning_api_enabled]': "1"
                         }
                         response_post = s.post(url, data=payload)
+                        b_repeat = True
                 except (KeyboardInterrupt, SystemExit):
                     sys.exit()
                 except Exception as e:
@@ -530,6 +538,12 @@ def process_orgs(username, actions):
         if 'c' in actions:
             # Write the Change Log JSON data out to file
             json.dump(json_changelogs, open(changelog_file, "w"))
+
+        if b_repeat: 
+            print("Waiting 2 minutes for Meraki to catch up with new Org changes before continuing...")
+            b_repeat = False
+            time.sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
+        
 
         return adv_lics
 
