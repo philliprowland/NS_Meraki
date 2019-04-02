@@ -114,3 +114,4 @@ bin/activate.fish
 bin/keyring
 bin/pip3
 bin/pip3.5
+NS_Meraki_Workspace.code-workspace

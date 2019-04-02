@@ -41,6 +41,8 @@ def main(json_events):
         # Iterate through each change log entry in the current org
         for log_entry in securityEvents['top_threats']:
             try:
+                if org_entry['orgName'] == None:
+                    logging.warn("Found invalid Org Name: {0}".format(org_entry['orgID']))
                 if 'msg' in log_entry['threat']:
                     list_entry = [org_entry['orgName'],log_entry['threat']['msg'],log_entry['threat']['priority'],\
                         log_entry['occurrences']]
