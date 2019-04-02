@@ -43,9 +43,9 @@ def main(json_events):
             try:
                 if org_entry['orgName'] is None:
                     org_entry['orgName'] = org_entry['orgID']
-                if log_entry['threat']['priority'] is None:
-                    log_entry['threat']['priority'] = 0
                 if 'msg' in log_entry['threat']:
+                    if log_entry['threat']['priority'] is None:
+                        log_entry['threat']['priority'] = 0
                     list_entry = [org_entry['orgName'],log_entry['threat']['msg'],log_entry['threat']['priority'],\
                         log_entry['occurrences']]
                 else:
