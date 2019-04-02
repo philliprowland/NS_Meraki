@@ -26,7 +26,7 @@ def main(json_events):
         try :
             #logging.debug(org_entry['securityEvents'])
             securityEvents = json.loads(org_entry['securityEvents'])
-            logging.debug("{0} has {1} Entries in it's change log".format(org_entry['orgName'], securityEvents['total_events']))
+            logging.debug("{0} has {1} Entries in it's event log".format(org_entry['orgName'], securityEvents['total_events']))
 
             # Skip this entry if it's there aren't any events
             if org_entry['securityEvents'] == 0:
@@ -38,11 +38,13 @@ def main(json_events):
             logging.debug(str(org_entry))
             continue
 
-        # Iterate through each change log entry in the current org
+        # Iterate through each event entry in the current org
         for log_entry in securityEvents['top_threats']:
             try:
-                if org_entry['orgName'] == None:
-                    logging.warn("Found invalid Org Name: {0}".format(org_entry['orgID']))
+                if org_entry['orgName'] is None:
+                    org_entry['orgName'] = org_entry['orgID']
+                if log_entry['threat']['priority'] is None:
+                    log_entry['threat']['priority'] = 0
                 if 'msg' in log_entry['threat']:
                     list_entry = [org_entry['orgName'],log_entry['threat']['msg'],log_entry['threat']['priority'],\
                         log_entry['occurrences']]
@@ -79,9 +81,9 @@ def main(json_events):
     return list_logtext
 
 def usage():
-    print('parse_changelog.py -i <filename> [options]')
+    print('parse_events.py -i <filename> [options]')
     print(' -h               : Print this usage message')
-    print(' -i <filename>    : Import <filename> and parse out changes')
+    print(' -i <filename>    : Import <filename> and parse out events')
     print(' -o <filename>    : The output file to write json results to')
     print(' -w               : Only include web based logs')
     print(' -t <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
@@ -137,20 +139,20 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    # Get the json change file
+    # Get the json event file
     try:
-        logging.info("{0}Loading JSON Change Log file: {1}{2}".format(P,W,str_input_file))
-        json_changelog = json.load(open(str_input_file, "r"))
+        logging.info("{0}Loading JSON Event Log file: {1}{2}".format(P,W,str_input_file))
+        json_eventlog = json.load(open(str_input_file, "r"))
         
     except Exception as e:
-        str_err = "Error reading JSON Change Log file: "
+        str_err = "Error reading JSON Event Log file: "
         logging.fatal("{0}{1}{2}{3}\n{4}".format(
             R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
         ))
         logging.shutdown()
         sys.exit(2)
 
-    l_results = main(json_changelog)
+    l_results = main(json_eventlog)
 
     if len(str_output_file) <=0:
         for s_log in l_results:
