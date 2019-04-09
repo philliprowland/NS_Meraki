@@ -166,19 +166,26 @@ def grant_org_admin(apikey, org):
             net_perms = []
             new_perms = []
             if admin is not None:
-                org_perms = admin['orgAccess']
-                net_perms = new_perms = admin['networks']
-                #   Copy any specified network permissions to existing list
-                #   so we don't update every time due to mismatched
-                #   levels of detail
-                for new_perm in new_admin['networks']:
-                    net = next((i for i in net_perms if i['id'] == new_perm['id']), None)
-                    if net is None:
-                        new_perms.append(new_perm)
+                if admin['accountStatus'] == "unverified":
+                    logging.info("{0} has not accepted the previous invite, deleting...".format(new_admin['name']))
+                    resp = meraki.deladmin(apikey, org['id'], admin['id'], True)
+                    logging.debug(resp)
+                    admin = None
+                else:
+                    org_perms = admin['orgAccess']
+                    net_perms = new_perms = admin['networks']
+                    #   Copy any specified network permissions to existing list
+                    #   so we don't update every time due to mismatched
+                    #   levels of detail
+                    for new_perm in new_admin['networks']:
+                        net = next((i for i in net_perms if i['id'] == new_perm['id']), None)
+                        if net is None:
+                            new_perms.append(new_perm)
+                
 
             # Split logic based on existing permissions
             if org_perms == new_admin['orgAccess'] and net_perms == new_perms:
-                logging.info("{0} already has the correct access".format(new_admin['name']))
+                    logging.info("{0} already has the correct access".format(new_admin['name']))
             elif admin is None:
                 logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
                 logging.debug("Invite Details: {0}".format(new_admin))
