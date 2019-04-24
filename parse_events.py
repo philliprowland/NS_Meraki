@@ -61,7 +61,8 @@ def main(json_events):
         
     list_logs.sort()
 
-    list_logtext = []
+    list_logtext = list_ignoretext = []
+    list_ignore = {}
     for log in list_logs:
         try:
             C = R
@@ -72,14 +73,22 @@ def main(json_events):
                     C = R if (log[2] >= 3) else G
                     #write = True if (log)
                 list_logtext.append("{4}Priority {2} - {6} {0}: {3} occurrences of {1} {5}".format(log[0],log[1],log[2],log[3],C,W,log[4]))
+            else:
+                if log[4] in list_ignore:
+                    list_ignore[log[4]] += log[3]
+                else:
+                    list_ignore[log[4]] = log[3]
         except Exception as e:
             logging.error("{0}Error printing event: {1} - {2}{3}".format(R,str(log[0]),str(log[1]),W))
             logging.error("{0}Error printing event: {1}{2}\n{3}".format(
                 R,W,str(e), traceback.format_tb(e.__traceback__)
             ))
             continue
+    for log in list_ignore.items():
+        ignore = next((item for item in json_ignore if item['id'] == log[0]), None)
+        list_ignoretext.append("{0} total occurences of {1} - {2} have been ignored".format(log[1],log[0],ignore['description']))
 
-    return list_logtext
+    return list_logtext, list_ignoretext
 
 def usage():
     print('parse_events.py -i <filename> [options]')
@@ -171,14 +180,18 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    l_results = main(json_eventlog)
+    l_results, l_ignore = main(json_eventlog)
 
     if len(str_output_file) <=0:
         for s_log in l_results:
+            print(s_log)
+        print ("---Ignored Events---")
+        for s_log in l_ignore:
             print(s_log)
     else:
         with open(str_output_file, "w") as f:
             for s_log in l_results:
                 f.write(s_log[5:] + "\n") # Strip out the colorization in the file as this does not translate to any format other than linux console
-
+            for s_log in l_ignore:
+                f.write(s_log + "\n")
     logging.shutdown()
