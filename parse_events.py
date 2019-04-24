@@ -192,6 +192,4 @@ if __name__ == "__main__":
         with open(str_output_file, "w") as f:
             for s_log in l_results:
                 f.write(s_log[5:] + "\n") # Strip out the colorization in the file as this does not translate to any format other than linux console
-            for s_log in l_ignore:
-                f.write(s_log + "\n")
     logging.shutdown()
