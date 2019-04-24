@@ -47,10 +47,10 @@ def main(json_events):
                     if log_entry['threat']['priority'] is None:
                         log_entry['threat']['priority'] = 0
                     list_entry = [org_entry['orgName'],log_entry['threat']['msg'],log_entry['threat']['priority'],\
-                        log_entry['occurrences']]
+                        log_entry['occurrences'],log_entry['threat']['id']]
                 else:
                     list_entry = [org_entry['orgName'],log_entry['threat']['name'],log_entry['threat']['disposition'],\
-                        log_entry['occurrences']]
+                        log_entry['occurrences'],log_entry['threat']['id']]
                 list_logs.append(list_entry)
             except Exception as e:
                 logging.error(R + "Error parsing Threat" + W)
@@ -65,14 +65,15 @@ def main(json_events):
     for log in list_logs:
         try:
             C = R
-            write = True # TODO: Implement an ignore file based on thread ID
-            if type(log[2]) is int:
-                #if log[2] < 
-                C = R if (log[2] >= 3) else G
-                #write = True if (log)
-            list_logtext.append("{4}Priority {2} - {0}: {3} occurrences of {1} {5}".format(log[0],log[1],log[2],log[3],C,W))
+            ignore = next((item for item in json_ignore if item['id'] == log[4]), None)
+            if ignore == None:
+                if type(log[2]) is int:
+                    #if log[2] < 
+                    C = R if (log[2] >= 3) else G
+                    #write = True if (log)
+                list_logtext.append("{4}Priority {2} - {6} {0}: {3} occurrences of {1} {5}".format(log[0],log[1],log[2],log[3],C,W,log[4]))
         except Exception as e:
-            logging.error(R + "Error printing event: " + log[0] + " - " + log[1] + W)
+            logging.error("{0}Error printing event: {1} - {2}{3}".format(R,str(log[0]),str(log[1]),W))
             logging.error("{0}Error printing event: {1}{2}\n{3}".format(
                 R,W,str(e), traceback.format_tb(e.__traceback__)
             ))
@@ -88,17 +89,18 @@ def usage():
     print(' -w               : Only include web based logs')
     print(' -t <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
     print(' -l <# level>     : Only include priority events greater than this')
+    print(' -e <filename>    : Exclude events as described in this file')
 
 if __name__ == "__main__":
 
     global str_date, b_webonly, i_timelapse
 
-    str_input_file = str_output_file = ''
+    str_input_file = str_output_file = str_ignore_file = ''
     # TODO Tab complete filenames
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hi:o:wt:', ['debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hi:o:wt:e:', ['debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -126,6 +128,8 @@ if __name__ == "__main__":
             b_webonly = True
         elif opt == '-t':  # Set time-lapse argument for filtering to recent logs only
             i_timelapse = int(arg)
+        elif opt == '-e':  # Exclude file used to ignore events
+            str_ignore_file = arg
         else:
             assert False, "unhandled option"
 
@@ -146,6 +150,21 @@ if __name__ == "__main__":
         
     except Exception as e:
         str_err = "Error reading JSON Event Log file: "
+        logging.fatal("{0}{1}{2}{3}\n{4}".format(
+            R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
+        ))
+        logging.shutdown()
+        sys.exit(2)
+
+    # Get the json ignore file
+    try:
+        if len(str_ignore_file) > 0:
+            logging.info("{0}Loading JSON Ignore file: {1}{2}".format(P,W,str_ignore_file))
+            json_ignore = json.load(open(str_ignore_file, "r"))
+        else:
+            json_ignore = ""
+    except Exception as e:
+        str_err = "Error reading JSON Ignore file: "
         logging.fatal("{0}{1}{2}{3}\n{4}".format(
             R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
         ))
