@@ -184,15 +184,15 @@ if __name__ == "__main__":
 
     if len(str_output_file) <= 0:
         
-        for s_log in l_results[0]:
+        for s_log in l_results:
             print(s_log)
         print ("---Ignored Events---")
-        for s_log in l_results[1]:
+        for s_log in l_results:
             print(s_log)
     else:
         with open(str_output_file, "w") as f:
             logging.info("Starting file write of results.")
-            for s_log in l_results[0]:
+            for s_log in l_results:
                 f.write(s_log[5:] + "\n") # Strip out the colorization in the file as this does not translate to any format other than linux console
             
     logging.shutdown()
