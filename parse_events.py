@@ -180,16 +180,19 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    (l_results, l_ignore) = main(json_eventlog)
+    l_results = main(json_eventlog)
 
     if len(str_output_file) <= 0:
-        for s_log in l_results:
+        
+        for s_log in l_results[0]:
             print(s_log)
         print ("---Ignored Events---")
-        for s_log in l_ignore:
+        for s_log in l_results[1]:
             print(s_log)
     else:
         with open(str_output_file, "w") as f:
-            for s_log in l_results:
+            logging.info("Starting file write of results.")
+            for s_log in l_results[0]:
                 f.write(s_log[5:] + "\n") # Strip out the colorization in the file as this does not translate to any format other than linux console
+            
     logging.shutdown()
