@@ -88,7 +88,7 @@ def main(json_events):
         ignore = next((item for item in json_ignore if item['id'] == log[0]), None)
         list_ignoretext.append("{0} total occurences of {1} - {2} have been ignored".format(log[1],log[0],ignore['description']))
 
-    return list_logtext, list_ignoretext
+    return (list_logtext, list_ignoretext)
 
 def usage():
     print('parse_events.py -i <filename> [options]')
@@ -180,9 +180,9 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    l_results, l_ignore = main(json_eventlog)
+    (l_results, l_ignore) = main(json_eventlog)
 
-    if len(str_output_file) <=0:
+    if len(str_output_file) <= 0:
         for s_log in l_results:
             print(s_log)
         print ("---Ignored Events---")
