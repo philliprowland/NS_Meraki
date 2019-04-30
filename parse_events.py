@@ -72,7 +72,7 @@ def main(json_events):
                     #if log[2] < 
                     C = R if (log[2] >= 3) else G
                     #write = True if (log)
-                list_logtext.append("{4}Priority {2} - {6} {0}: {3} occurrences of {1} {5}".format(log[0],log[1],log[2],log[3],C,W,log[4]))
+                list_logtext.append("{4}Priority {2} - {0}: {3} occurrences of {1} {5} {6} ".format(log[0],log[1],log[2],log[3],C,W,log[4]))
             else:
                 if log[4] in list_ignore:
                     list_ignore[log[4]] += log[3]
@@ -84,6 +84,7 @@ def main(json_events):
                 R,W,str(e), traceback.format_tb(e.__traceback__)
             ))
             continue
+    
     for log in list_ignore.items():
         ignore = next((item for item in json_ignore if item['id'] == log[0]), None)
         list_ignoretext.append("{0} total occurences of {1} - {2} have been ignored".format(log[1],log[0],ignore['description']))
