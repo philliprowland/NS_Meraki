@@ -62,7 +62,8 @@ def main(json_events):
     list_logs.sort()
 
     ignore = None
-    list_logtext = list_ignoretext = []
+    list_logtext = []
+    list_ignoretext = []
     list_ignore = {}
     for log in list_logs:
         try:
@@ -93,7 +94,7 @@ def main(json_events):
 
     logging.debug("logtext: {0}".format(list_logtext))
 
-    return list_logtext
+    return list_logtext, list_ignoretext
 
 def usage():
     print('parse_events.py -i <filename> [options]')
@@ -185,7 +186,7 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    l_results = main(json_eventlog)
+    l_results, l_ignored = main(json_eventlog)
 
     if len(str_output_file) <= 0:
         
