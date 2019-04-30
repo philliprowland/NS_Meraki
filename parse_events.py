@@ -74,7 +74,7 @@ def main(json_events):
                     C = R if (log[2] >= 3) else G
                     #write = True if (log)
                 list_logtext.append("{4}Priority {2} - {0}: {3} occurrences of {1} {5} {6} ".format(log[0],log[1],log[2],log[3],C,W,log[4]))
-                debug.info("Appending {0} to list_logtext: {1}".format(log[4], ignore))
+                logging.info("Appending {0} to list_logtext: {1}".format(log[4], ignore))
             else:
                 if log[4] in list_ignore:
                     list_ignore[log[4]] += log[3]
