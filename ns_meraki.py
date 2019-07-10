@@ -173,7 +173,8 @@ def grant_org_admin(apikey, org):
                     admin = None
                 else:
                     org_perms = admin['orgAccess']
-                    net_perms = new_perms = admin['networks']
+                    net_perms = admin['networks']
+                    new_perms = admin['networks']
                     #   Copy any specified network permissions to existing list
                     #   so we don't update every time due to mismatched
                     #   levels of detail
@@ -184,8 +185,15 @@ def grant_org_admin(apikey, org):
                 
 
             # Split logic based on existing permissions
-            if org_perms == new_admin['orgAccess'] and net_perms == new_perms:
-                    logging.info("{0} already has the correct access".format(new_admin['name']))
+            logging.debug("New Org Access: {0} Current Org Access: {1}".format(new_admin['orgAccess'], org_perms))
+            if new_admin['orgAccess'] == "None" and org_perms is not None:
+                logging.info("{0}{1} needs to be removed{2}".format(B, new_admin['name'], W))
+                resp = meraki.deladmin(apikey, org['id'], admin['id'], True)
+                logging.debug(resp)
+            elif new_admin['orgAccess'] == "None":
+                logging.info("{0}{1} has already been removed{2}".format(B, new_admin['name'], W))
+            elif org_perms == new_admin['orgAccess'] and net_perms == new_perms:
+                logging.info("{0} already has the correct access".format(new_admin['name']))
             elif admin is None:
                 logging.info("{0}{1} needs to be invited{2}".format(B, new_admin['name'], W))
                 logging.debug("Invite Details: {0}".format(new_admin))
