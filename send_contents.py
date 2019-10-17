@@ -113,8 +113,8 @@ if __name__ == "__main__":
     success = False
     while success == False:
         count += 1
-        success = main(str_input_file, str_login, str_email_address, str_subject)
-        if count >= 3:
+        if count > 3:
             break
+        success = main(str_input_file, str_login, str_email_address, str_subject)
 
     logging.shutdown()
