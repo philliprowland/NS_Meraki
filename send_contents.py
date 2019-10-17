@@ -30,7 +30,7 @@ def main(str_file, str_login, str_email, str_subject):
             R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
         ))
         logging.shutdown()
-        sys.exit(2)
+        return False
 
     msg = MIMEMultipart()
     msg['From'] = str_login
@@ -51,9 +51,9 @@ def main(str_file, str_login, str_email, str_subject):
         logging.fatal("{0}{1}{2}{3}\n{4}".format(
             R, str_err, str(e), W, traceback.format_tb(e.__traceback__)
         ))
-        mailserver.close()
         logging.shutdown()
-        sys.exit(2)
+        return False
+    return True
 
 def usage():
     print('send_contents.py -i <filename> [options]')
@@ -108,6 +108,13 @@ if __name__ == "__main__":
         logging.shutdown()
         sys.exit(2)
 
-    main(str_input_file, str_login, str_email_address, str_subject)
+    # Try to email 3 times
+    count = 0
+    success = False
+    while success == False:
+        count += 1
+        success = main(str_input_file, str_login, str_email_address, str_subject)
+        if count >= 3:
+            break
 
     logging.shutdown()
