@@ -242,7 +242,7 @@ def process_orgs(username, actions):
     b_repeat = True
     while b_repeat:
         with requests.Session() as s:  
-            b_repeat = False  # Default to checking once
+            b_repeat = False  # Setup escape from while
             # Get the Organization List, this is the default redirect page after login
             host = 'https://account.meraki.com'
             p = s.post(host + '/login/login', data=payload)
@@ -262,7 +262,6 @@ def process_orgs(username, actions):
 
             # Follow first Org Redirect and check for new confirmations
             print(G+"Checking for new Organization Access"+W)
-            b_repeat = False  # Setup escape from while
             try:
                 org_redirect = s.get(host + '/login/org_choose?eid=' + (org_ids[0])[0])
                 logging.info("Initial Org Redirect URL: " + org_redirect.url)
@@ -320,7 +319,6 @@ def process_orgs(username, actions):
             
             if b_repeat: 
                 print("Waiting 2 minutes for Meraki to catch up with new Orgs before continuing...")
-                b_repeat = False
                 time.sleep(120)  # Wait 2 minutes for Meraki to catch up with any orgs we've accepted
         
         # Exit now if we don't need to get license or enable API
