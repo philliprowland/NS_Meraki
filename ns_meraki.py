@@ -706,9 +706,9 @@ if __name__ == "__main__":
         os.makedirs(os.path.dirname(str_events_file), exist_ok=True)
 
     if 'f' in actions:
-        os.makedirs(os.path.dirname(str_updatewindow_file))
+        os.makedirs(os.path.dirname(str_updatewindow_file), exist_ok=True)
 
     if 'r' in actions:
-        os.makedirs(os.path.dirname(str_firewallrules_file))
+        os.makedirs(os.path.dirname(str_firewallrules_file), exist_ok=True)
 
     main(username, actions)
