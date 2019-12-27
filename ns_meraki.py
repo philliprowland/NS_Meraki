@@ -31,7 +31,7 @@ def main(username, actions):
     logging.debug("{0}Return Value: {1}{2}".format(P, W, str(org_lics)))
 
     # Run all of the API based calls
-    if 'a' in actions or 'g' in actions:
+    if 'a' in actions or 'g' in actions or 'r' in actions:
         apikey = keyring.get_password('merakiapi', username)
         orgs = meraki.myorgaccess(apikey, True)
         logging.debug("{0}The Organization List: {1}{2}".format(P, str(orgs), W))
@@ -57,62 +57,70 @@ def process_org_api(apikey, org):
 
         grant_org_admin(apikey, org)
 
-    # Validate and adjust Network Alerts
-    if 'g' in actions:
+    # Run Per Network API calls
+    if 'g' in actions or 'r' in actions:
         try:
             networks = meraki.getnetworklist(apikey, org['id'], None, True)
             logging.debug(P + "API Network List: " + W + str(networks))
 
             for network in networks:
-                needs_update = False
+                # Validate and adjust Network Alerts
+                if 'g' in actions:
+                    needs_update = False
 
-                alerts = meraki_extension.getnetworkalerts(apikey, network['id'], True)
-                logging.debug("{3}{0}Alerts: {1}{2}".format(P, W, str(alerts),network['id']))
+                    alerts = meraki_extension.getnetworkalerts(apikey, network['id'], True)
+                    logging.debug("{3}{0}Alerts: {1}{2}".format(P, W, str(alerts),network['id']))
 
-                # Dump JSON alert data to a file
-                json_file = "json/AlertSettings/{0}_{1}_{2}_{3}.json".format(
-                    str_date, network['organizationId'],network['id'],network['name']
-                )
-                os.makedirs(os.path.dirname(json_file), exist_ok=True)
-                json.dump(alerts, open(json_file, "w"))
+                    # Dump JSON alert data to a file
+                    json_file = "json/AlertSettings/{0}_{1}_{2}_{3}.json".format(
+                        str_date, network['organizationId'],network['id'],network['name']
+                    )
+                    os.makedirs(os.path.dirname(json_file), exist_ok=True)
+                    json.dump(alerts, open(json_file, "w"))
 
-                # Stop email all Network Admins
-                if alerts['defaultDestinations']['allAdmins'] is True:
-                    logging.debug("{0}Found Default Destinations:{1}{2}".format(P,alerts['defaultDestinations'],W))
-                    needs_update = True
-                    alerts['defaultDestinations']['allAdmins'] = False
-
-                    # Add alerts email the Default Email list
-                    if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
+                    # Stop email all Network Admins
+                    if alerts['defaultDestinations']['allAdmins'] is True:
+                        logging.debug("{0}Found Default Destinations:{1}{2}".format(P,alerts['defaultDestinations'],W))
                         needs_update = True
-                        alerts['defaultDestinations']['emails'].append('alerts@netsmartai.com')
+                        alerts['defaultDestinations']['allAdmins'] = False
 
-                    # TODO: Remove all user admin accounts
-                    # Remove help desk email in favor of the alerts (NOC) email
-                    if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
-                        needs_update = True
-                        alerts['defaultDestinations']['emails'].remove('help@netsmart.support')
-
-                # Fix the destinations list for any alert set to All Admins
-                for alert in alerts['alerts']:
-                    if alert['enabled'] is False:
-                        continue
-
-                    if alert['alertDestinations']['allAdmins'] is True:
-                        logging.debug("Found alert:{0}".format(str(alert)))
-                        needs_update = True
-
-                        alert['alertDestinations']['allAdmins'] = False
+                        # Add alerts email the Default Email list
                         if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
-                            alert['alertDestinations']['emails'].append('alerts@netsmartai.com')
-                        # TODO: Remove all netsmart user admin accounts
-                        if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
-                            alert['alertDestinations']['emails'].remove('help@netsmart.support')
+                            needs_update = True
+                            alerts['defaultDestinations']['emails'].append('alerts@netsmartai.com')
 
-                if needs_update:
-                    logging.info("{0}Updating Alert Settings: {1}{2}".format(B, W, str(alerts)))
-                    resp = meraki_extension.updatenetworkalert(apikey, network['id'], alerts, True)
-                    logging.info("{0}New Alert Settings: {1}{2}".format(B, resp, W))
+                        # TODO: Remove all user admin accounts
+                        # Remove help desk email in favor of the alerts (NOC) email
+                        if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
+                            needs_update = True
+                            alerts['defaultDestinations']['emails'].remove('help@netsmart.support')
+
+                    # Fix the destinations list for any alert set to All Admins
+                    for alert in alerts['alerts']:
+                        if alert['enabled'] is False:
+                            continue
+
+                        if alert['alertDestinations']['allAdmins'] is True:
+                            logging.debug("Found alert:{0}".format(str(alert)))
+                            needs_update = True
+
+                            alert['alertDestinations']['allAdmins'] = False
+                            if 'alerts@netsmartai.com' not in alerts['defaultDestinations']['emails']:
+                                alert['alertDestinations']['emails'].append('alerts@netsmartai.com')
+                            # TODO: Remove all netsmart user admin accounts
+                            if 'help@netsmart.support' in alerts['defaultDestinations']['emails']:
+                                alert['alertDestinations']['emails'].remove('help@netsmart.support')
+
+                    if needs_update:
+                        logging.info("{0}Updating Alert Settings: {1}{2}".format(B, W, str(alerts)))
+                        resp = meraki_extension.updatenetworkalert(apikey, network['id'], alerts, True)
+                        logging.info("{0}New Alert Settings: {1}{2}".format(B, resp, W))
+                
+                
+                if 'r' in actions:
+                    json_firewallrules = meraki.getmxl3fwrules(apikey, network['id'], True)
+                    os.makedirs(os.path.dirname(str_firewallrules_file), exist_ok=True)
+                    json.dump(json_firewallrules, open(json_file, "a"))
 
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
@@ -464,6 +472,13 @@ def process_orgs(username, actions):
                             
                         # TODO: Parse all threat settings
 
+                # Firmware update checks and scheduling
+                if 'F' in actions or 'f' in actions:
+                    NotImplemented
+                
+                # Check for unscheduled available firmware updates
+                # Schedule the updates
+
                 # Append this Org and details to the return list
                 adv_lics.append([org[0], org[1], advanced_license, amp_mode, ids_mode, ids_rule])
             
@@ -574,12 +589,14 @@ def usage():
     print(' -d <# seconds>   : Only include logs after <# seconds> in the past (604800 = 1 Week)')
     print(' -b               : Validate API access')
     print(' -g               : Update all Network Alert Rules')
+    print(' -f <filename>    : Write the next firmware upgrade window to filename')
+    print(' -F               : Schedule available firmware updates for next window')
 
 
 
 if __name__ == "__main__":
 
-    global json_admins, str_date, changelog_file, i_timelapse, str_events_file
+    global json_admins, str_date, changelog_file, i_timelapse, str_events_file, str_updatewindow_file, str_firewallrules_file
 
     username = str_admin_file = str_events_file = ''
     admin = ['', 'read-only', '']
@@ -590,7 +607,7 @@ if __name__ == "__main__":
 
     #   Get command line arguments and parse for options
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:e:lto:c:bgd:', ['output-file=', 'log=', 'debug='])
+        opts, args = getopt.getopt(sys.argv[1:], 'hu:a:e:lto:c:bgd:f:Fr:', ['output-file=', 'log=', 'debug='])
     except getopt.GetoptError as err:
         print(str(err))
         usage()
@@ -626,7 +643,7 @@ if __name__ == "__main__":
             actions.append('l')
         elif opt == '-t':  # List Companies with their Threat Gaps
             actions.append('t')
-        elif opt in ('-o', 'output-file='):  # Output changes to file
+        elif opt in ('-o', 'output-file='):  # Output to file
             output_file = arg
             actions.append('o')
         elif opt == '-c':  # Output change logs to file
@@ -638,9 +655,17 @@ if __name__ == "__main__":
             actions.append('g')
         elif opt == '-d':  # Set time-lapse argument for filtering to recent logs only
             i_timelapse = int(arg)
+        elif opt == '-f':  # Save next firmware windows to file
+            str_updatewindow_file = arg
+            actions.append('f')
+        elif opt == '-F':  # Schedule firmware updates
+            actions.append('F')
+        elif opt == '-r':  # Save firewall rules to file
+            str_firewallrules_file = arg
+            actions.append('r')
 
-        # TODO: f for firewall rule gaps
-        # TODO: f arg as a json file to match (does firewall rules contain a rule with policy, protocol, destPort)
+        # TODO: r for firewall rule output
+        # TODO: R arg as a json file to match (does firewall rules contain a rule with policy, protocol, destPort)
         else:
             assert False, "unhandled option"
 
@@ -679,5 +704,11 @@ if __name__ == "__main__":
 
     if 'e' in actions:
         os.makedirs(os.path.dirname(str_events_file), exist_ok=True)
+
+    if 'f' in actions:
+        os.makedirs(os.path.dirname(str_updatewindow_file))
+
+    if 'r' in actions:
+        os.makedirs(os.path.dirname(str_firewallrules_file))
 
     main(username, actions)
