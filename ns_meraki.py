@@ -595,6 +595,7 @@ def usage():
     print(' -g               : Update all Network Alert Rules')
     print(' -f <filename>    : Write the next firmware upgrade window to filename')
     print(' -F               : Schedule available firmware updates for next window')
+    print(' -r <filename>    : Write Firewall rules out to filename')
 
 
 
