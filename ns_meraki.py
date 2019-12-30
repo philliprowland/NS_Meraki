@@ -119,11 +119,12 @@ def process_org_api(apikey, org):
                 
                 if 'r' in actions:
                     json_firewallrules = meraki.getmxl3fwrules(apikey, network['id'], True)
-                    for rule in json_firewallrules:
-                        rule['orgname'] = org['name']
-                        rule['networkid'] = network['id']
-                    os.makedirs(os.path.dirname(str_firewallrules_file), exist_ok=True)
-                    json.dump(json_firewallrules, open(str_firewallrules_file, "a"))
+                    if json_firewallrules.len > 0:
+                        for rule in json_firewallrules:
+                            rule['orgname'] = org['name']
+                            rule['networkid'] = network['id']
+                        os.makedirs(os.path.dirname(str_firewallrules_file), exist_ok=True)
+                        json.dump(json_firewallrules, open(str_firewallrules_file, "a"))
 
         except (KeyboardInterrupt, SystemExit):
             sys.exit()
